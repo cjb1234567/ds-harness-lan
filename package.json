@@ -1,7 +1,7 @@
 {
-  "name": "ds-harness-remote",
-  "version": "0.5.23",
-  "description": "End-to-end encrypted remote access to DeepSeek Harness and experimental Codex workspaces from desktop, web, and Android, with dsh-TUI Host support.",
+  "name": "ds-harness-lan",
+  "version": "0.5.23-lan.1",
+  "description": "Community LAN fork of ds-harness-remote: direct IP-and-port connections with shared-token authentication and Noise-encrypted Harness, CodeX and ACP workspace access.",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -10,24 +10,22 @@
     "codex",
     "remote-development",
     "end-to-end-encryption",
-    "webrtc"
+    "lan",
+    "direct-connection"
   ],
-  "homepage": "https://github.com/liguobao/ds-harness-remote#readme",
+  "homepage": "https://github.com/cjb1234567/ds-harness-lan#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liguobao/ds-harness-remote.git"
+    "url": "git+https://github.com/cjb1234567/ds-harness-lan.git"
   },
   "bugs": {
-    "url": "https://github.com/liguobao/ds-harness-remote/issues"
+    "url": "https://github.com/cjb1234567/ds-harness-lan/issues"
   },
   "author": "liguobao <lgb835485368@gmail.com>",
   "license": "MIT",
   "private": true,
   "type": "module",
   "main": "./index.js",
-  "bin": {
-    "ds-harness-remote": "./packages/plugin/bin/ds-harness-remote.js"
-  },
   "types": "./packages/plugin/public.d.ts",
   "exports": {
     ".": {
@@ -38,20 +36,21 @@
     "./client": "./packages/plugin/dist/client.github.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
     "packages/plugin/dist/index.js",
     "packages/plugin/dist/client.github.js",
-    "packages/plugin/bin/ds-harness-remote.js",
     "packages/plugin/public.d.ts",
     "packages/plugin/LICENSE",
-    "dsh-plugin.json",
     "cordis.patch.yml",
     "locale/",
-    "README.md",
-    "package.json"
+    "package.json",
+    "icon.svg",
+    "packages/plugin/README.md",
+    "dsh-plugin.json"
   ],
   "dsh": {
     "bundle": {
@@ -159,8 +158,5 @@
     "@deepseek-ai/dsh-client-ui-settings-general": "0.2.1-rc.1",
     "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.1-rc.1",
     "@deepseek-ai/dsh-client-ui-settings-plugin-inventory": "0.2.1-rc.1"
-  },
-  "optionalDependencies": {
-    "@roamhq/wrtc": "0.10.0"
   }
 }

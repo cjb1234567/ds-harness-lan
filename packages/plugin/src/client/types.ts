@@ -23,6 +23,8 @@ export interface RemoteStatus {
   deviceName?: string
   deviceId?: string
   serverUrl?: string
+  clientAuthorized?: boolean
+  lan?: { enabled: boolean; bindAddress: string; port: number; hosts: Array<{ id: string; name: string; host: string; port: number }> }
   connected?: boolean
   recoveryGeneration?: number
   connectedTargetDeviceId?: string

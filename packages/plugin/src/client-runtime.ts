@@ -42,6 +42,7 @@ import type { HostIdentity, IdentityStore } from './identity-store.js'
 import { uuidV7 } from './ids.js'
 import type { SafeLogger } from './logging.js'
 import { LoopbackPreview } from './loopback-preview.js'
+import { discoverLanDevices } from './lan-discovery.js'
 import { RemoteTypertGateway } from './remote-typert-gateway.js'
 import { safeErrorCode } from './safe-error.js'
 import { RemoteSessionTools, type SessionToolOperation } from './remote-session-tools.js'
@@ -131,6 +132,7 @@ export class ClientModeRuntime {
     this.control = new ClientControl({
       detailedStatus: (...args) => owner.detailedStatus(...args),
       devices: (...args) => owner.devices(...args),
+      get lan() { return owner.config.lan !== undefined },
       get server() { return owner.server },
       authorizeClientWithAccount: (...args) => owner.authorizeClientWithAccount(...args),
       startClientOAuthQrLogin: (...args) => owner.startClientOAuthQrLogin(...args),
@@ -172,7 +174,7 @@ export class ClientModeRuntime {
   async start(): Promise<void> {
     if (this.closed) throw new Error('client remote-mode runtime is closed')
     this.identity = await this.identities.loadOrCreate(this.config.deviceName)
-    this.server.bindIdentity(this.identity)
+    if (this.config.lan === undefined) this.server.bindIdentity(this.identity)
     this.gatewaySwitch.install()
     this.logger.info('client remote-mode identity ready', {
       deviceId: shortId(this.identity.deviceId),
@@ -181,7 +183,7 @@ export class ClientModeRuntime {
     // A previously authorized Client should make the local Host controllable
     // on startup as well. Do not register an anonymous Client just to probe:
     // only persisted Client credentials opt into this default.
-    if (this.config.hostControl?.enabled !== false
+    if (this.config.lan === undefined && this.config.hostControl?.enabled !== false
       && this.host !== undefined
       && this.server.hasStoredAuthorization !== undefined) {
       try {
@@ -196,6 +198,7 @@ export class ClientModeRuntime {
   }
 
   async authorizeHostByDefault(): Promise<void> {
+    if (this.config.lan !== undefined) return
     try {
       if (this.host === undefined) return
       if (this.config.hostControl?.enabled === false) return
@@ -215,7 +218,12 @@ export class ClientModeRuntime {
   status(): Record<string, unknown> {
     const targetStatus = this.gatewaySwitch.status()
     return {
-      available: this.config.serverUrl !== undefined,
+      available: this.config.lan !== undefined || this.config.serverUrl !== undefined,
+      ...(this.config.lan === undefined ? {} : {
+        lan: { enabled: this.config.lan.enabled, bindAddress: this.config.lan.bindAddress,
+          port: this.config.lan.port, configuredHosts: this.config.lan.hosts.length },
+        clientAuthorized: true,
+      }),
       identityReady: this.identity !== undefined,
       deviceId: this.identity?.deviceId,
       deviceName: this.identity?.name,
@@ -225,7 +233,8 @@ export class ClientModeRuntime {
       recoveryGeneration: this.recoveryGeneration,
       transport: this.connected?.client.getStats().mode ?? 'Disconnected',
       connectedTargetDeviceId: this.connected?.target.deviceId,
-      preferredTransports: this.config.forceRelay ? ['relay'] : ['lan', 'p2p', 'turn', 'relay'],
+      preferredTransports: this.config.lan !== undefined ? ['lan'] : this.config.forceRelay ? ['relay'] : ['lan', 'p2p', 'turn', 'relay'],
+      connectedHostDeviceId: this.connected?.hostDeviceId ?? this.connected?.target.deviceId,
       ...(this.connectionProgress === undefined ? {} : {
         connectionProgress: {
           targetDeviceId: this.connectionProgress.targetDeviceId,
@@ -242,7 +251,7 @@ export class ClientModeRuntime {
       backend: this.cursorVirtual !== undefined
         ? this.acpVirtualBackend
         : this.codexVirtual === undefined ? 'harness' : 'codex',
-      hostAuthorizationAvailable: this.host !== undefined,
+      hostAuthorizationAvailable: this.config.lan !== undefined || this.host !== undefined,
       ...(this.host === undefined ? {} : { host: this.host.hostStatus() }),
     }
   }
@@ -267,7 +276,8 @@ export class ClientModeRuntime {
           platform: process.platform,
         },
         remote: {
-          deviceId: connected.target.deviceId,
+          deviceId: connected.hostDeviceId ?? connected.target.deviceId,
+          configuredHostId: connected.target.deviceId,
           name: connected.target.name,
           platform: connected.target.platform,
         },
@@ -281,6 +291,7 @@ export class ClientModeRuntime {
     if (this.closed) throw new ClientModeError('CANCELLED', 'The Remote runtime is closed.')
     this.assertHostAuthorizationForDeviceDiscovery()
     this.requireIdentity()
+    if (this.config.lan !== undefined) return discoverLanDevices(this.config.lan, signal)
     const serverDevices = await this.server.listDevices(signal)
     signal?.throwIfAborted()
     const remoteDevices = serverDevices.filter(device => device.deviceId !== this.host?.hostStatus().deviceId)
@@ -308,6 +319,7 @@ export class ClientModeRuntime {
    * from a Host that the user has already been told to re-authorize.
    */
   private assertHostAuthorizationForDeviceDiscovery(): void {
+    if (this.config.lan !== undefined) return
     const status = this.host?.hostStatus()
     if (status === undefined || status.error === undefined || !HOST_AUTHORIZATION_ERRORS.has(status.error)) return
     const message = status.error === 'DEVICE_REVOKED'
@@ -317,6 +329,7 @@ export class ClientModeRuntime {
   }
 
   async authorizeClientWithAccount(email: string, password: string): Promise<unknown> {
+    if (this.config.lan !== undefined) throw new ClientModeError('LAN_ACCOUNT_UNAVAILABLE', 'Account authorization is unavailable in LAN mode. Configure LAN Host access locally.')
     let authorization
     try {
       authorization = await this.server.authorizeWithAccount(this.requireIdentity(), email, password)
@@ -332,10 +345,12 @@ export class ClientModeRuntime {
   }
 
   async startClientOAuthQrLogin(provider: OAuthProvider): Promise<unknown> {
+    if (this.config.lan !== undefined) throw new ClientModeError('LAN_ACCOUNT_UNAVAILABLE', 'Account authorization is unavailable in LAN mode. Configure LAN Host access locally.')
     return this.server.startOAuthQrLogin(provider)
   }
 
   async pollClientOAuthQrLogin(qrId: string): Promise<unknown> {
+    if (this.config.lan !== undefined) throw new ClientModeError('LAN_ACCOUNT_UNAVAILABLE', 'Account authorization is unavailable in LAN mode. Configure LAN Host access locally.')
     const result = await this.server.pollOAuthQrLogin(this.requireIdentity(), qrId, async () => {
       this.identity = await this.identities.reset(this.config.deviceName)
       this.server.bindIdentity(this.identity)
@@ -348,6 +363,7 @@ export class ClientModeRuntime {
   }
 
   async clearClientAuthorization(): Promise<void> {
+    if (this.config.lan !== undefined) throw new ClientModeError('LAN_ACCOUNT_UNAVAILABLE', 'Account authorization is unavailable in LAN mode. Configure LAN Host access locally.')
     const cleanup = this.leaveRemote()
     this.codexOpenedSessions.clear()
     const results = await Promise.allSettled([cleanup, this.server.revokeCurrentDevice()])
@@ -359,6 +375,7 @@ export class ClientModeRuntime {
   }
 
   async setHostAuthorization(enabled: boolean): Promise<unknown> {
+    if (this.config.lan !== undefined) throw new ClientModeError('LAN_AUTHORIZATION_LOCAL_ONLY', 'LAN Host access is configured locally; account authorization is unavailable.')
     if (this.host === undefined) throw new ClientModeError('METHOD_NOT_ALLOWED', 'This plugin is not running as a Host.')
     if (!enabled) {
       await this.host.clearHostAuthorization()
@@ -554,7 +571,7 @@ export class ClientModeRuntime {
     }
     this.assertLocalHarnessCarrierAvailable()
     const virtual = CodexVirtualHarness.remote(remote.client, {
-      deviceId: remote.target.deviceId,
+      deviceId: remote.hostDeviceId ?? remote.target.deviceId,
       name: remote.target.name,
     }, harnessSessionGeneration(this.host?.localHarnessVersion?.()), new RemoteTypertGateway(remote.client))
     try {
@@ -643,7 +660,7 @@ export class ClientModeRuntime {
     }
     this.assertLocalHarnessCarrierAvailable()
     const virtual = AcpVirtualHarness.remote(remote.client, {
-      deviceId: remote.target.deviceId,
+      deviceId: remote.hostDeviceId ?? remote.target.deviceId,
       name: remote.target.name,
     }, backend, remote.features.acpModelLoadsSession ? ['agent.acp.antigravity.model-load.v1'] : [], new RemoteTypertGateway(remote.client))
     let workspace: AcpVirtualWorkspaceView
@@ -693,7 +710,7 @@ export class ClientModeRuntime {
     }
     this.assertLocalHarnessCarrierAvailable()
     const virtual = AcpVirtualHarness.remote(remote.client, {
-      deviceId: remote.target.deviceId,
+      deviceId: remote.hostDeviceId ?? remote.target.deviceId,
       name: remote.target.name,
     }, backend, remote.features.acpModelLoadsSession ? ['agent.acp.antigravity.model-load.v1'] : [], new RemoteTypertGateway(remote.client))
     try {
@@ -732,7 +749,7 @@ export class ClientModeRuntime {
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
-    this.server.close?.()
+    if (this.config.lan === undefined) this.server.close?.()
     try {
       await this.leaveRemote()
     } finally {

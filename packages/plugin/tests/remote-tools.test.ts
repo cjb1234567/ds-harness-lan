@@ -23,8 +23,8 @@ async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), 'remote-tools-'))
   cleanups.push(() => rm(directory, { recursive: true, force: true }))
   const gateway = { invoke: vi.fn(), dispatchRpc: vi.fn(), openWireStream: vi.fn() }
-  const server = { bindIdentity: vi.fn(), revokeCurrentDevice: vi.fn() }
-  const runtime = new ClientModeRuntime(resolveConfig({ serverUrl: 'https://example.com' }),
+  const server = {}
+  const runtime = new ClientModeRuntime(resolveConfig({}, {}),
     new IdentityStore({ directory }), server as unknown as ClientServerApi, gateway,
     new SafeLogger({ debug() {}, info() {}, warn() {}, error() {} }, 'error'))
   await runtime.start()
@@ -105,16 +105,16 @@ describe('Remote discovery authority and lifecycle', () => {
     state.connected = undefined
   })
 
-  it('closes late discovery carriers after caller cancellation, sign-out or shutdown', async () => {
-    await runScenarios(['cancel', 'sign-out', 'shutdown'].map(action => ({ name: action, run: async () => {
+  it('closes late discovery carriers after caller cancellation, local exit or runtime shutdown', async () => {
+    await runScenarios(['cancel', 'local-exit', 'shutdown'].map(action => ({ name: action, run: async () => {
       const { runtime, state } = await fixture()
       let finish!: (remote: ConnectedRemote) => void
-      vi.spyOn(state.connection, 'connect').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+      const connect = vi.spyOn(state.connection, 'connect').mockImplementation(() => new Promise(resolve => { finish = resolve }))
       const controller = new AbortController()
       const pending = runtime.discoverToolWorkspaces('host', controller.signal)
       const rejected = expect(pending).rejects.toThrow()
       if (action === 'cancel') controller.abort()
-      else if (action === 'sign-out') await runtime.clearClientAuthorization()
+      else if (action === 'local-exit') await runtime.setMode('local')
       else await runtime.close()
       const close = vi.fn(async () => undefined)
       const rpc = vi.fn()
@@ -122,6 +122,7 @@ describe('Remote discovery authority and lifecycle', () => {
       await rejected
       expect(close).toHaveBeenCalledOnce()
       expect(rpc).not.toHaveBeenCalled()
+      expect(connect).toHaveBeenCalledOnce()
     } })), cleanup)
   })
 })

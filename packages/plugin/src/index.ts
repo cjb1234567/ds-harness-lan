@@ -5,7 +5,6 @@ import type { SettingsForms } from '@deepseek-ai/dsh-settings'
 import { ClientModeRuntime, type HostConnectionHandle } from './client-runtime.js'
 import {
   Config,
-  DEFAULT_REMOTE_SERVER_URL,
   resolveConfig,
   type Config as ConfigShape,
   type ConfigInput,
@@ -34,23 +33,22 @@ import { runHmrSafe, type HmrContextLike } from './hmr-safe-settings.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    dshRemote: HostPluginRuntime
-    dshRemoteClient: ClientModeRuntime
+    dshLan: HostPluginRuntime
+    dshLanClient: ClientModeRuntime
     typertGateway: TypertGatewayLike
   }
 }
 
-export const name = 'ds-harness-remote'
+export const name = 'ds-harness-lan'
 export { Config }
 
-const legacyLoaderModuleNames = new Set(['dsh-remote', '@dsh-remote/plugin'])
 // Settings-registry generation (≤0.1.6). The branded `SettingsNamespace` type
 // was removed with the registry in rc.1, so the literals stay plain strings.
-const pluginSettingsNamespace = 'ds-harness-remote'
+const pluginSettingsNamespace = 'ds-harness-lan'
 const legacySettingsNamespace = 'dsh-remote'
 
 /** Fallback entry id when the Loader cannot locate this plugin's entry. */
-const DEFAULT_ENTRY_ID = 'ds-harness-remote'
+const DEFAULT_ENTRY_ID = 'ds-harness-lan'
 /** Root include entry id prefixing every profile row's Loader path id. */
 const INCLUDE_ENTRY_PREFIX = 'include:'
 
@@ -139,7 +137,7 @@ export function apply(ctx: Context, entry: EntryConfig | ConfigShape | undefined
           undefined,
         )
         return control.register(connection, webServer)
-      }, 'dsh-remote pending control')
+      }, 'dsh-lan pending control')
     }
     const startActiveRuntime = async (activeContext: Context): Promise<void> => {
       await disposePendingControl?.()
@@ -168,6 +166,13 @@ async function activate(
   entryId: string,
   tuiBinding?: TuiRemoteBinding,
 ): Promise<void> {
+  // Until both assemblies share an official gateway-ownership API, fail before
+  // capturing or patching its dispatchers. Never stop the upstream plugin here.
+  if (ctx.get('dshRemoteClient', false) !== undefined || ctx.get('dshRemote', false) !== undefined) {
+    throw Object.assign(new Error('LAN cannot share the active Harness gateway with upstream Remote. Manually disable upstream Remote before enabling LAN; LAN will never disable it automatically.'), {
+      code: 'LAN_GATEWAY_CONFLICT',
+    })
+  }
   const settings = ctx.get('settings') as SettingsServiceLike | undefined
   const settingsBinding = await createSettingsBinding(ctx, settings, readConfig, entryId)
   const connection = ctx.get('connection') as HostConnectionHandle | undefined
@@ -177,14 +182,12 @@ async function activate(
   const resolvedConfig = resolveConfig(settingsBinding?.get() ?? readConfig())
   // dsh-TUI has no settings UI or browser connection. In that profile the
   // QR-authorized Host is enabled against the hosted Server by default.
-  const config: ResolvedConfig = connection === undefined && resolvedConfig.serverUrl === undefined
-    ? { ...resolvedConfig, serverUrl: DEFAULT_REMOTE_SERVER_URL }
-    : resolvedConfig
+  const config: ResolvedConfig = { ...resolvedConfig, serverUrl: undefined }
   const defaultIdentityDirectory = new IdentityStore().directory
   if (!config.enabled) {
     if (connection !== undefined) {
       const controlRuntime = new PluginControlRuntime(config, defaultIdentityDirectory, settingsBinding, undefined, undefined)
-      ctx.effect(() => controlRuntime.register(connection, webServer), 'dsh-remote disabled control')
+      ctx.effect(() => controlRuntime.register(connection, webServer), 'dsh-lan disabled control')
     }
     return
   }
@@ -245,14 +248,14 @@ async function activate(
     )
 
     let clientRuntime: ClientModeRuntime | undefined
-    if (config.serverUrl !== undefined && connection !== undefined) {
+    if (connection !== undefined) {
       const clientIdentities = new IdentityStore({
-        directory: serverStorageDirectory(defaultIdentityDirectory, config.serverUrl, 'client'),
+        directory: `${defaultIdentityDirectory}/client`,
       })
       clientRuntime = new ClientModeRuntime(
         config,
         clientIdentities,
-        new ClientServerApi(config.serverUrl, new ServerCredentialStore(clientIdentities.directory)),
+        new ClientServerApi('http://127.0.0.1', new ServerCredentialStore(clientIdentities.directory)),
         nativeTypertGateway,
         logger,
         runtime,
@@ -286,11 +289,11 @@ async function activate(
       }
       runtime = fresh.runtime
       clientRuntime = fresh.clientRuntime
-      ctx.dshRemote = runtime
+      ctx.dshLan = runtime
       if (clientRuntime !== undefined) {
-        if (clientServiceProvided) ctx.dshRemoteClient = clientRuntime
+        if (clientServiceProvided) ctx.dshLanClient = clientRuntime
         else {
-          ctx.provide('dshRemoteClient', clientRuntime)
+          ctx.provide('dshLanClient', clientRuntime)
           clientServiceProvided = true
         }
       }
@@ -302,15 +305,19 @@ async function activate(
     return replacement
   }
 
+  const remoteTools = installRemoteDiscoveryTools(ctx, () =>
+    closed || !resolveConfig(settingsBinding?.get() ?? readConfig()).remoteTools?.enabled
+      ? undefined
+      : clientRuntime, config.remoteTools?.enabled ?? true)
   const controlRuntime = connection === undefined
     ? undefined
-    : new PluginControlRuntime(config, defaultIdentityDirectory, settingsBinding, clientRuntime, runtime, replaceServer)
+    : new PluginControlRuntime(config, defaultIdentityDirectory, settingsBinding, clientRuntime, runtime, replaceServer,
+      enabled => remoteTools.setEnabled(enabled))
 
-  ctx.provide('dshRemote', runtime)
-  if (clientRuntime !== undefined) ctx.provide('dshRemoteClient', clientRuntime)
+  ctx.provide('dshLan', runtime)
+  if (clientRuntime !== undefined) ctx.provide('dshLanClient', clientRuntime)
   let tuiTarget: TuiRemoteTarget = { runtime, config }
   if (tuiBinding !== undefined) tuiBinding.target = tuiTarget
-  await disableLegacyLoaderEntries(ctx, logger)
   await ctx.effect(async () => {
     const disposeControl = controlRuntime?.register(connection!, webServer)
     try {
@@ -342,8 +349,7 @@ async function activate(
       await clientRuntime?.close()
       await runtime.close()
     }
-  }, 'dsh-remote lifecycle')
-  if (config.remoteTools?.enabled) installRemoteDiscoveryTools(ctx, () => closed ? undefined : clientRuntime)
+  }, 'dsh-lan lifecycle')
 }
 
 /**
@@ -410,7 +416,8 @@ async function createSettingsBinding(
     applies: 'restart',
     validate: value => { resolveConfig(value) },
   })
-  reportSettingsMigration(ctx, await migrateLegacySettings(settings, scope, hmr))
+  // LAN owns an independent settings section. Never register or copy the
+  // upstream Remote namespace while both plugins may be mounted.
   return {
     get: () => scope.get(),
     replace: section => runHmrSafe<void>(async () => { await scope.replace(section) }, hmr),
@@ -421,14 +428,6 @@ async function createSettingsBinding(
 function isLegacySettingsProvider(value: unknown): value is LegacySettingsProviderLike {
   return typeof value === 'object' && value !== null
     && typeof (value as { register?: unknown }).register === 'function'
-}
-
-function reportSettingsMigration(
-  ctx: Context,
-  migration: 'migrated' | 'skipped' | 'failed',
-): void {
-  if (migration === 'migrated') ctx.logger.info('migrated legacy Remote settings namespace')
-  if (migration === 'failed') ctx.logger.warn('failed to migrate legacy Remote settings namespace')
 }
 
 /**
@@ -467,35 +466,6 @@ export async function migrateLegacySettings(
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-async function disableLegacyLoaderEntries(ctx: Context, logger: SafeLogger): Promise<void> {
-  const loader = ctx.get('loader') as LoaderLike | undefined
-  if (!isLoaderLike(loader)) return
-
-  const currentEntryId = loader.locate?.(ctx.fiber)
-  for (const entry of loader.entries()) {
-    const moduleName = entry.options.name
-    if (moduleName === undefined || !legacyLoaderModuleNames.has(moduleName)) continue
-    if (entry.id === currentEntryId || entry.options.disabled === true) continue
-
-    try {
-      await loader.update(entry.id, { disabled: true })
-      logger.warn('disabled legacy loader entry', { entryId: entry.id, moduleName })
-    } catch {
-      logger.warn('failed to disable legacy loader entry', {
-        entryId: entry.id,
-        moduleName,
-        code: 'LOADER_UPDATE_FAILED',
-      })
-    }
-  }
-}
-
-function isLoaderLike(value: unknown): value is LoaderLike {
-  return typeof value === 'object' && value !== null
-    && typeof (value as { entries?: unknown }).entries === 'function'
-    && typeof (value as { update?: unknown }).update === 'function'
 }
 
 export type { ResolvedConfig } from './config.js'

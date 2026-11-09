@@ -21,8 +21,11 @@ import {
   websocketUrl,
 } from './client-runtime-contract.js'
 import { ClientSecureTransport } from './client-secure-transport.js'
+import { LanTransport } from './lan-transport.js'
+import { lanHostEndpoint, resolveLanHost } from './lan-discovery.js'
 import type { ResolvedConfig } from './config.js'
 import type { HostIdentity, IdentityStore, TrustedPeer } from './identity-store.js'
+import { fingerprint } from './identity-store.js'
 import type { SafeLogger } from './logging.js'
 import type { ServerHostDevice } from './server-api.js'
 import { ClientServerApi } from './server-api.js'
@@ -44,6 +47,7 @@ export class ClientConnection {
   constructor(private readonly context: ClientConnectionContext) {}
 
   async connect(targetDeviceId: string, signal?: AbortSignal, options: { background?: boolean } = {}): Promise<ConnectedRemote> {
+    if (this.context.config.lan !== undefined) return this.connectLan(targetDeviceId, signal, options)
     signal?.throwIfAborted()
     const progressRunId = options.background ? -1 : this.context.connectionProgressRun + 1
     if (!options.background) {
@@ -186,6 +190,72 @@ export class ClientConnection {
       const failure = closed && closeError !== undefined ? closeError : error
       await client?.close().catch(() => undefined)
       throw failure
+    } finally {
+      signal?.removeEventListener('abort', onAbort)
+    }
+  }
+
+  private async connectLan(targetDeviceId: string, signal?: AbortSignal, options: { background?: boolean } = {}): Promise<ConnectedRemote> {
+    signal?.throwIfAborted()
+    const progressRunId = options.background ? -1 : ++this.context.connectionProgressRun
+    if (!options.background) this.context.connectionProgress = { runId: progressRunId, targetDeviceId, phase: 'checking-host' }
+    const identity = this.context.requireIdentity()
+    let client: RemoteClientCore | undefined
+    const onAbort = () => { void client?.close().catch(() => undefined) }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    try {
+      const config = this.context.config.lan
+      const { host, facts } = await resolveLanHost(config, targetDeviceId, signal)
+      this.updateConnectionProgress(progressRunId, 'authorizing-peer')
+      // Token-authenticated discovery is not Server membership. Pin the real
+      // Host identity separately from the configured navigation/selection key.
+      const existing = this.context.identities.trustedPeer(facts.deviceId)
+      if (existing !== undefined && existing.publicKey !== facts.identityPublicKey) {
+        throw new ClientModeError('PEER_IDENTITY_MISMATCH', 'The configured LAN Host identity key changed unexpectedly.')
+      }
+      const peer: TrustedPeer = existing ?? {
+        deviceId: facts.deviceId, name: facts.name, platform: facts.platform, publicKey: facts.identityPublicKey,
+        fingerprint: fingerprint(facts.identityPublicKey), trustedAt: Date.now(),
+      }
+      signal?.throwIfAborted()
+      const transport = new LanTransport({
+        ...lanHostEndpoint(config, host), localDeviceId: identity.deviceId, targetDeviceId: facts.deviceId,
+        identityPublicKey: identity.publicKey, connectTimeoutMs: config.connectTimeoutMs,
+        handshakeTimeoutMs: config.handshakeTimeoutMs, heartbeatIntervalMs: config.heartbeatIntervalMs,
+      })
+      this.updateConnectionProgress(progressRunId, 'probing', ['lan'])
+      client = new RemoteClientCore(new ClientSecureTransport(transport, identity, peer), 60_000)
+      let closed = false
+      let closeError: Error | undefined
+      client.onClose(error => { closed = true; closeError = error })
+      signal?.throwIfAborted()
+      await client.connect()
+      signal?.throwIfAborted()
+      const features = await probeRemoteHostFeatures(client, facts.clientVersion)
+      signal?.throwIfAborted()
+      if (closed) throw closeError ?? new ClientModeError('TRANSPORT_CLOSED', 'The LAN connection closed during discovery.', true)
+      // Commit a new local pin only after the Host proved possession of its
+      // private key and encrypted capability discovery succeeded.
+      const pinned = this.context.identities.trustedPeer(facts.deviceId)
+      if (pinned !== undefined && pinned.publicKey !== peer.publicKey) {
+        throw new ClientModeError('PEER_IDENTITY_MISMATCH', 'The LAN Host identity pin changed during connection.')
+      }
+      if (pinned === undefined) await this.context.identities.trustPeer({
+        deviceId: peer.deviceId, name: facts.name, platform: facts.platform, publicKey: peer.publicKey,
+      })
+      signal?.throwIfAborted()
+      if (closed) throw closeError ?? new ClientModeError('TRANSPORT_CLOSED', 'The LAN connection closed during authorization.', true)
+      this.updateConnectionProgress(progressRunId, 'connected', ['lan'])
+      return {
+        client, target: { ...peer, deviceId: host.id, name: host.name }, hostDeviceId: facts.deviceId,
+        transport, features, progressRunId,
+        ...(facts.clientVersion === undefined ? {} : { clientVersion: facts.clientVersion }),
+        ...(facts.harnessVersion === undefined ? {} : { harnessVersion: facts.harnessVersion }),
+      }
+    } catch (error) {
+      this.clearConnectionProgress(progressRunId)
+      await client?.close().catch(() => undefined)
+      throw error
     } finally {
       signal?.removeEventListener('abort', onAbort)
     }

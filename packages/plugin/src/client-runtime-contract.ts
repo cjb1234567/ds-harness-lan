@@ -1,16 +1,26 @@
 import type { ControlResult } from './control-result.js'
 import { RemoteClientCore } from '@dsh-remote/client-core'
 import type { CodexAppFrameData, CodexAppStreamClosedData, RemoteWorkspaceTypeDescription } from '@dsh-remote/protocol'
-import type { RtcConnectionDiagnostics, RtcIceServer } from '@dsh-remote/webrtc'
-import { AdaptiveTransport, stunOnlyIceServers } from '@dsh-remote/webrtc'
+import type { RtcConnectionDetails, RtcConnectionDiagnostics, RtcIceServer } from '@dsh-remote/webrtc'
+import { stunOnlyIceServers } from '@dsh-remote/webrtc'
 import type { ResolvedConfig } from './config.js'
 import type { TrustedPeer } from './identity-store.js'
 import type { AuthorizedPeerDevice, ServerHostDevice } from './server-api.js'
 
+export interface RemoteConnectionDetails {
+  preferredTransports: Array<'lan' | 'p2p' | 'turn' | 'relay'>
+  negotiatedCapabilities: string[]
+  webRtcEnabled: boolean
+  webRtc?: RtcConnectionDetails
+}
+
 export interface ConnectedRemote {
   client: RemoteClientCore
   target: TrustedPeer
-  transport: AdaptiveTransport
+  /** Transport diagnostics only; business traffic always uses the secure client. */
+  readonly transport: { connectionDetails(): Promise<RemoteConnectionDetails> }
+  /** Actual Noise/terminal identity; target.deviceId remains the configured selection key. */
+  hostDeviceId?: string
   features: RemoteHostFeatures
   progressRunId: number
   clientVersion?: string
@@ -95,7 +105,11 @@ export interface RemoteDeviceView {
   deviceId: string
   name: string
   platform: string
-  membershipId: string
+  membershipId?: string
+  /** Actual Host identity, distinct from the configured deviceId selection key. */
+  hostDeviceId?: string
+  address?: string
+  error?: string
   online: boolean
   lastSeenAt?: number
   clientVersion?: string

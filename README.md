@@ -1,3 +1,21 @@
+# DSH LAN — community fork
+
+`ds-harness-lan@0.5.23-lan.1` is a community fork of [liguobao/ds-harness-remote](https://github.com/liguobao/ds-harness-remote), not an official DeepSeek product. This repository targets direct LAN connections between existing Harness installations on computers. The upstream author attribution and [MIT license](packages/plugin/LICENSE) remain intact.
+
+## Install this LAN fork
+
+In **Plugin management → Install from GitHub**, use repository **`cjb1234567/ds-harness-lan`** and select tag **`v0.5.23-lan.1`** after that tag is published. Install the same revision on both computers, then restart Harness. This is a GitHub installation source, not an npm package; no npm availability is claimed.
+
+On the Host, open the LAN settings, explicitly enable LAN listening, choose a trusted IPv4 interface and port (default `59090`), and set a strong private shared token. On the other computer, enter the Host's LAN IP, port and the same token. See the [bilingual LAN configuration and security guide](packages/plugin/README.md) for configuration details.
+
+**Security:** initial descriptor/token exchange uses plain HTTP on the LAN; Noise IK encrypts subsequent business traffic, not that initial exchange. Use only a trusted network and firewall, never public port forwarding. Terminals execute with the Host OS user's privileges. The LAN listener is disabled by default.
+
+**Scope:** this fork does not release or claim LAN support for the Android, iOS, browser-extension, hosted Remote Web or server applications inherited below. The retained upstream README describes upstream Remote, including its npm installation and mobile releases; those links and instructions are not installation instructions or support claims for this LAN fork.
+
+---
+
+## Upstream Remote documentation (retained for attribution and reference)
+
 <p align="center">
 
   <img src="docs/logo.svg" alt="DeepSeek Harness Remote" width="600">

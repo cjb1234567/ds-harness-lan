@@ -1,122 +1,60 @@
-# DeepSeek Harness Remote
+# DSH LAN / DSH 局域网连接
 
-Continue DeepSeek Harness sessions and experimental Codex, Cursor, and Antigravity workspaces from another device over an end-to-end encrypted connection.
+`ds-harness-lan@0.5.23-lan.1` is an independent community LAN fork of
+[liguobao/ds-harness-remote](https://github.com/liguobao/ds-harness-remote), not an official DeepSeek product.
+The upstream author attribution and MIT license are retained; the network-node icon is original artwork for this fork.
+The fork repository and installation source are [cjb1234567/ds-harness-lan](https://github.com/cjb1234567/ds-harness-lan); upstream does not publish or support this fork.
 
-[GitHub](https://github.com/liguobao/ds-harness-remote) · [Full guide](https://github.com/liguobao/ds-harness-remote/blob/main/README.md) · [中文说明](https://github.com/liguobao/ds-harness-remote/blob/main/README.zh.md) · [Remote Web](https://dsh.r2049.cn/app) · [Android](https://github.com/liguobao/ds-harness-remote/releases/latest)
+## Direct LAN use
 
-`ds-harness-remote` is the Remote Host and workspace plugin for DeepSeek Harness. Harness keeps running on your work computer with its existing workspaces, tools, and permission controls; Remote gives authorized devices another window into that environment.
+Load this fork as a plugin in an existing Harness installation on both machines; it is not a standalone app and exports no CLI executable.
+In Plugin management, install from GitHub repository `cjb1234567/ds-harness-lan`, selecting tag `v0.5.23-lan.1` after it is published, then restart Harness. Install the same revision on both machines. Until publication, use a local package/directory; no npm availability is claimed. This fork does not release Android clients or claim Android LAN support.
+Connect to the Host's private LAN IP address and port instead of an account/relay server.
+Existing Harness, CodeX and ACP workspace/session business flows remain subject to each backend's availability and permissions.
 
-> Install the npm package through Desktop Plugin management or `dsh plugin`. Both manage the selected Harness profile and its bundle configuration.
+The plugin's top-level `enabled` switch and the LAN listener's `lan.enabled` switch are separate.
+The supplied bundle keeps the plugin enabled but sets **`lan.enabled: false`**, with **port `59090`**.
+On the Host, explicitly enable LAN and configure a strong, private shared token; for example, the plugin entry's configuration is:
 
-## Remote Agent tools
-
-After signing in through the local Desktop/web-profile Remote panel, ask a native Harness Agent to list online Remote machines and the workspaces on a selected machine. The plugin registers `remote_list_hosts` (no arguments) and `remote_list_workspaces` (`hostId` from the first tool) when the official `tools` service is available.
-
-Discovery reuses Remote account authorization, pinned Host identities and encrypted transport. Each workspace query owns a temporary connection and leaves the UI selection unchanged. Results identify the backend (`harness`, `codex`, or an available ACP backend); failed backend catalogs appear in `unavailable`. Host names, workspace paths and explicitly requested session history become part of the calling Agent's tool context and normal Harness tool history; credentials are not returned.
-
-For native Harness workspaces (`backend: "harness"`), the same Agent can use:
-
-| Tool | Purpose |
-| --- | --- |
-| `remote_list_sessions` | List root sessions in an existing workspace; live catalog pagination. |
-| `remote_read_session` | Read bounded native history, with an older-page cursor and explicit truncation. |
-| `remote_create_session` | Create an empty session in the selected workspace. |
-| `remote_send_message` | Queue a text task or follow-up under existing Host permissions. |
-| `remote_wait_sessions` | Observe up to eight sessions, for up to 60 seconds; zero requests snapshots. |
-| `remote_interrupt_session` | Request interruption of the current execution; does not undo edits or delete queued messages. |
-| `remote_upload_file` | Upload a local file to a Harness workspace root (1 GiB on LAN/direct P2P; otherwise 20 MiB), without overwriting existing files. |
-| `remote_download_file` | Download a workspace-relative file to this plugin machine’s Downloads directory (50 MiB maximum). |
-| `remote_get_operation` | Read an operation receipt without executing the operation again. |
-
-Session tools require explicit `hostId`, `backend` and `workspaceId`; existing-session operations also require `sessionId`. Create/send/interrupt require a unique `operationId` (16–128 letters, digits, underscores or hyphens). The same key and parameters return the same in-memory receipt; changing parameters under that key is rejected. An `accepted` send receipt means queued, not completed. After an `unknown` result, inspect the receipt and remote session instead of retrying with a new key. Receipts are lost on Remote reset, leaving Remote, logout or restart; `not_found` is not proof that an earlier operation did not execute.
-
-For example, ask: “On the Linux Host, create a Harness session in my project, run its tests, and report the result here.” The Agent discovers the target, creates and messages a session, then waits and reads its history. An `idle` status does not prove the task objective succeeded. Pending approval/question detection is limited to retained history; use the native UI to handle those requests. Waiting never approves or interrupts work automatically.
-
-CodeX/ACP currently support workspace discovery only through these tools. This entry does not register an external MCP server. Terminal-only dsh-TUI profiles currently lack the local Remote Client runtime needed by these tools; they can still be discovered as target Hosts.
-
-## Install
-
-### DSH Desktop
-
-In DeepSeek Harness Desktop, open **Extensions / Plugin management**, choose installation
-from **npm**, and enter:
-
-```text
-ds-harness-remote@0.5.23
+```yaml
+enabled: true
+role: host
+lan:
+  enabled: true
+  bindAddress: 192.168.1.10 # Replace with this Host's LAN interface address.
+  port: 59090
+  accessToken: REPLACE_WITH_A_LONG_RANDOM_SECRET
+terminal:
+  enabled: true
+loopback:
+  ports: [] # Explicitly add only the preview ports you intend to expose.
 ```
 
-Restart Desktop after installation. Its official `dsh` launcher can also install the package:
-
-```sh
-dsh plugin --profile desktop add -w ds-harness-remote@0.5.23
-```
-
-Use Desktop's official launcher to manage its reserved `desktop` profile.
-
-### Existing DSH installation
-
-Add the current package version to the `web` profile, then restart Harness:
-
-```sh
-dsh plugin --profile web add -w ds-harness-remote@0.5.23
-```
-
-### dsh-TUI Host
-
-Remote can also run as a Host in a terminal-only [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) profile:
-
-```sh
-dsh plugin --profile dsh-tui add -w ds-harness-remote@0.5.23
-```
-
-After starting dsh-TUI, manage Remote with `/remote`, `/remote login`, `/remote status`, and `/remote logout`.
-
-## Highlights
-
-- Continue active Harness sessions and review progress from another computer, the web, or Android.
-- Send text and image prompts, answer questions, and handle permission requests.
-- Open workspaces on another authorized computer without replacing the native Harness interface.
-- Use the official workspace file tree and bounded read-only previews on supported Harness versions.
-- Use an optional Host-local terminal and authorized loopback development-service previews.
-- Open Host Codex projects in the existing Remote UI through the optional experimental Codex domain.
-- Access Cursor and Antigravity workspaces through the optional experimental ACP gateway, with client-side projections kept in memory.
-- Reach the Host without opening a public listening port or configuring router port forwarding.
-
-## Compatibility
-
-The development baseline is DeepSeek Harness `dsh-v0.2.1-rc.1`, retaining the official Typert Remote / Session V3 carrier from `0.2.0` RC. Earlier Typert carrier support remains capability-based.
-
-`0.5.19` removes Harness `0.1.1-rc.2` ApiProxy support from the Host and bundled Remote client. ApiProxy-only Hosts and missing capability discovery are rejected. CodeX/ACP Desktop projection also uses Typert only.
-
-The same package feature-detects the older settings registry and the `0.1.7-rc.1` and `0.2.0-rc.2` Volatile settings entry. Remote Web/Desktop and Android normalize released sessions that still report the retired `code` agent preset to `ptc`. The Host reads the running Harness version from the CLI entrypoint, or from the 0.2.0 Desktop shell's `@deepseek-ai/dsh-desktop-host` entrypoint when the Harness CLI package is only a sibling of that entrypoint inside `app.asar`.
-
-## Self-hosted Server
-
-This repository includes a minimal, single-account self-hosted Relay Server in [`apps/server`](https://github.com/liguobao/ds-harness-remote/tree/main/apps/server). Configure `DSH_SERVER_ACCOUNT` and `DSH_SERVER_PASSWORD`, then point the Host and clients at the same server URL. It provides account login, device credentials, encrypted Control/Noise forwarding, Relay, and a device-status page. It does not provide the complete multi-account Server, Remote Web session UI, or WebRTC/TURN deployment.
+On the client, enter that Host's IP, port and shared token in the LAN connection UI.
+Permit the selected port only on trusted LAN interfaces in the Host firewall; do not expose it using router forwarding or a public tunnel.
+The default bind address, if omitted, is `0.0.0.0`; choose a specific trusted interface where possible. The listening-address selector offers all IPv4 interfaces or a detected non-loopback IPv4 address; IPv6 and loopback addresses are not selectable. Saved addresses outside this list remain visible as disabled entries and are not automatically replaced.
+Enable/disable interactive terminals in the Host-local settings. Terminals run with the **actual Host OS user's privileges**, independently of Agent tool approvals.
+Development previews require an explicit `loopback.ports` allowlist (for example `[3000]`), and forward only authorized Host loopback services.
+Existing Host path, session and backend permission boundaries still apply; LAN access does not grant broader authority.
 
 ## Security boundary
 
-- Session traffic is encrypted on the Client and decrypted only by the selected Host using `Noise_IK_25519_ChaChaPoly_SHA256`.
-- Account membership and the Host's locally pinned device identity must both authorize a connection.
-- The Host creates outbound connections only; it does not listen on a public port.
-- Remote does not expose general tool RPC, remote desktop, or file-mutation APIs.
-- Interactive terminals are enabled by default and can be disabled in the Host-local Remote settings; they run as the Host user independently of Agent approvals.
+A shared token authenticates LAN pairing, and the existing **Noise IK** channel encrypts business traffic.
+However, **initial descriptor/token exchange uses plain HTTP on the LAN**, not HTTPS: it is not protected against LAN eavesdropping or an active intermediary during first contact.
+Use only a trusted, controlled network; do not treat Noise business encryption as protection for that initial exchange.
+Treat anyone who learns the shared token as potentially able to connect; keep it out of logs, screenshots and version control, and rotate it if exposed.
+This guide does not claim build, test or cross-device validation has passed.
 
-## Documentation
+## 中文快速说明
 
-- [Complete guide](https://github.com/liguobao/ds-harness-remote#readme)
-- [dsh-TUI Remote guide](https://github.com/liguobao/ds-harness-remote/blob/main/docs/dsh-tui.md)
-- [Codex Remote technical notes](https://github.com/liguobao/ds-harness-remote/blob/main/docs/codex-remote.md)
-- [Agent workspace integration guide](https://github.com/liguobao/ds-harness-remote/blob/main/docs/acp-integration.md)
-- [End-to-end encryption](https://github.com/liguobao/ds-harness-remote/blob/main/docs/end-to-end-encryption.md)
-- [Network and transport](https://github.com/liguobao/ds-harness-remote/blob/main/docs/network.md)
-- [Protocol reference](https://github.com/liguobao/ds-harness-remote/blob/main/docs/protocol.md)
-- [Changelog](https://github.com/liguobao/ds-harness-remote/blob/main/docs/CHANGELOG.md)
+这是基于 [ds-harness-remote 上游](https://github.com/liguobao/ds-harness-remote) 的独立社区 LAN fork，非 DeepSeek 官方插件；保留上游作者与 [MIT 许可](<./LICENSE>)，并使用原创网络连接图标。
+本分支仓库及安装源为 [cjb1234567/ds-harness-lan](https://github.com/cjb1234567/ds-harness-lan)，不表示上游发布或支持此 fork。
 
-This is an independent community project and is not an official DeepSeek product. Licensed under the [MIT License](./LICENSE).
-
-Downloads require a Harness workspace and session. Files are saved privately in a fresh `Downloads/dsh-remote-*` directory without overwriting existing files. The tool returns only the local path and byte count. It verifies version, size and chunk offsets and removes partial files on failure/cancellation. Host file limits still apply. For a browser connected to Harness, this downloads onto the machine running the plugin, not directly onto the browser device.
-
-`remote_upload_file` requires an absolute `localPath` on the plugin machine, the Harness host/workspace/session identifiers, and an `operationId`. Optional `name` sets the remote filename. Upload only files the user authorizes sending to that Host. The existing connection-scoped uploader publishes in the session workspace root, renaming collisions. The tool returns the remote filename, path and byte count; it does not send the file to the Agent as prompt text. For uncertain commit delivery, inspect the receipt and workspace rather than retrying with a new operation key.
-
-Upload size follows the actual encrypted transport: LAN and direct P2P allow up to 1 GiB (1,073,741,824 bytes); TURN, Relay and unknown paths retain 20 MiB. Both the client and updated Host enforce the limit throughout transfer. Falling back to relay stops an oversized upload and removes uncommitted data. Older Hosts may retain 20 MiB. The upload tool deadline is one hour; chunks remain bounded at 64 KiB.
+- 在插件管理中选择从 GitHub 安装，填写 `cjb1234567/ds-harness-lan`，待 tag 发布后选择 `v0.5.23-lan.1`；两端安装相同修订后重启 Harness。未发布时使用本地包，不声称 npm 已有此版本，也不发布 Android 客户端或宣称 Android LAN 支持。
+- 在两端已有的 Harness 中加载插件，用 Host 的局域网 **IP + 端口**直连，不依赖账号/中继服务；不提供独立 app 或 CLI 启动入口。
+- 插件总开关 `enabled` 与 LAN 开关分开；随包配置的总开关为 `true`，**`lan.enabled` 默认为 `false`，端口为 `59090`**。在 Host 本地显式开启 LAN、配置足够强的共享 token，再在客户端填写同一 IP、端口和 token。上方 YAML 为启用示例，不是默认开启声明。
+- 使用可信局域网网卡和防火墙规则，不做公网端口转发；未指定 `bindAddress` 时默认为 `0.0.0.0`，建议绑定具体可信网卡 IP。本机监听地址只可选择所有 IPv4 网卡或检测到的非回环 IPv4 地址，不提供 IPv6 和仅本机可访问地址；列表之外的已保存地址保留为禁用项，不自动替换。
+- **共享 token + Noise IK 保护配对认证与业务加密，但首次 descriptor/token 交换经过明文 HTTP LAN，不具备 HTTPS 保护**。只在可信网络使用，不能声称业务加密可防护首次交换时的窃听或中间人攻击。token 泄露后应更换，不记录到日志或提交到仓库。
+- 保留 Harness、CodeX、ACP 工作区及会话等原有业务，实际可用性取决于 Host 后端。终端由 Host 本地 `terminal.enabled` 控制，以 **Host 实际系统用户权限**运行，独立于 Agent 工具审批。
+- 开发预览必须在 `loopback.ports` 中明确放行端口（例如 `[3000]`）；默认空列表不开放预览服务。LAN 不扩大原有目录、会话、后端或 Host 权限边界。
+- 本文不表示构建、测试或跨设备验收已通过。

@@ -1,13 +1,8 @@
 import type { LocalizedMessage, Translate } from '../client-locale.js'
+import { lanStyles } from './styles.js'
 import type { StatusFeed } from '../status-stream.js'
-import {
-  connectionErrorMessage,
-  connectionStatusClass,
-  connectionStatusLabel,
-  formatLocalTime,
-  messageOf,
-} from './presentation.js'
-import type { ClientReact, PluginAssociation, PluginSettingsView, RemoteStatus } from './types.js'
+import { messageOf } from './presentation.js'
+import type { ClientReact, PluginSettingsView, RemoteStatus } from './types.js'
 
 export function createRemotePluginOptions(React: ClientReact) {
   function RemotePluginOptions(props: {
@@ -18,12 +13,8 @@ export function createRemotePluginOptions(React: ClientReact) {
     view?: 'summary' | 'page'
   }): unknown {
     const { t } = props
-    const [open, setOpen] = React.useState(props.view === 'page')
-    const [serverUrl, setServerUrl] = React.useState('')
     const [remoteToolsBusy, setRemoteToolsBusy] = React.useState(false)
     const [remoteToolsEnabled, setRemoteToolsEnabled] = React.useState(true)
-    const role = 'host' as const
-    const [associations, setAssociations] = React.useState<Partial<Record<'host' | 'client', PluginAssociation>>>({})
     const [loaded, setLoaded] = React.useState(false)
     const [writable, setWritable] = React.useState(false)
     const [busy, setBusy] = React.useState(false)
@@ -33,114 +24,24 @@ export function createRemotePluginOptions(React: ClientReact) {
     const [acpAvailability, setAcpAvailability] = React.useState<Record<string, boolean>>({})
     const [acpChecking, setAcpChecking] = React.useState<Record<string, boolean>>({})
     const [acpCheckResults, setAcpCheckResults] = React.useState<Record<string, boolean | undefined>>({})
-    const [reconnectBusy, setReconnectBusy] = React.useState(false)
-    const [hostStatus, setHostStatus] = React.useState<RemoteStatus['host'] | undefined>(undefined)
-    const [hostName, setHostName] = React.useState('')
-    const [hostDeviceId, setHostDeviceId] = React.useState('')
     const [notice, setNotice] = React.useState<LocalizedMessage | undefined>(undefined)
     const [error, setError] = React.useState<string | undefined>(undefined)
     const [settingsView, setSettingsView] = React.useState<PluginSettingsView | undefined>(undefined)
-    const associationReadRun = React.useRef(0)
-    const association = associations.client ?? associations.host
-
-    const applyAssociations = (view: PluginSettingsView): void => {
-      setAssociations(view.associations ?? (view.association === undefined ? {} : { host: view.association }))
-    }
-
-    const applyView = (view: PluginSettingsView, updateAssociations = true): void => {
+    const applyView = (view: PluginSettingsView): void => {
       setSettingsView(view)
-      setServerUrl(view.config.serverUrl ?? 'https://dsh.r2049.cn')
       setTerminalEnabled(view.config.terminal?.enabled ?? true)
       setRemoteToolsEnabled(view.config.remoteTools?.enabled ?? true)
       setAcpBackends((view.config.acp?.backends ?? []).map(item => ({ id: item.id, enabled: item.enabled !== false })))
       setAcpAvailability(view.acpAvailability ?? {})
-      if (updateAssociations) applyAssociations(view)
       setWritable(view.writable)
       setLoaded(true)
     }
 
-    const load = async (): Promise<void> => {
-      const run = ++associationReadRun.current
-      const [view, status] = await Promise.all([
-        props.control<PluginSettingsView>('settings.get'),
-        props.control<RemoteStatus>('status').catch(() => undefined),
-      ])
-      applyView(view, run === associationReadRun.current)
-      setHostStatus(status?.host)
-      setHostName(status?.deviceName ?? '')
-      setHostDeviceId(status?.host?.deviceId ?? '')
-    }
-
-    React.useEffect(() => {
-      void load().catch(reason => setError(messageOf(reason)))
-    }, [])
-
     React.useEffect(() => {
       let active = true
-      let authorizationKey: string | undefined
-      const unsubscribe = props.statusFeed.subscribe(status => {
-        setHostStatus(status.host)
-        setHostName(status.deviceName ?? '')
-        setHostDeviceId(status.host?.deviceId ?? '')
-        // Either account entry point rotates these identities on sign-out.
-        // Refresh the read-only settings snapshot on that change without
-        // fetching settings for ordinary connection/statistics updates.
-        const key = JSON.stringify([status.serverUrl, status.deviceId, status.host?.deviceId,
-          status.host?.authorized, status.host?.account])
-        if (key === authorizationKey) return
-        authorizationKey = key
-        const run = ++associationReadRun.current
-        void props.control<PluginSettingsView>('settings.get').then(view => {
-          if (active && run === associationReadRun.current) applyView(view)
-        }).catch(() => undefined)
-      })
-      return () => { active = false; unsubscribe() }
-    }, [props.statusFeed])
-
-    const logout = async (): Promise<void> => {
-      const run = ++associationReadRun.current
-      setBusy(true)
-      setError(undefined)
-      setNotice(undefined)
-      try {
-        const view = await props.control<PluginSettingsView>('settings.logout')
-        applyView(view, run === associationReadRun.current)
-        setNotice({ key: 'signedOut' })
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
-        setBusy(false)
-      }
-    }
-
-    const reconnectHost = async (): Promise<void> => {
-      setReconnectBusy(true)
-      setError(undefined)
-      setNotice(undefined)
-      try {
-        const status = await props.control<RemoteStatus>('host.reconnect')
-        setHostStatus(status.host)
-        setNotice({ key: 'reconnectStarted' })
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
-        setReconnectBusy(false)
-      }
-    }
-
-    const setCurrentDeviceControl = async (enabled: boolean): Promise<void> => {
-      setBusy(true)
-      setError(undefined)
-      setNotice(undefined)
-      try {
-        const status = await props.control<RemoteStatus>('host.authorization.set', { enabled })
-        setHostStatus(status.host)
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
-        setBusy(false)
-      }
-    }
+      void props.control<PluginSettingsView>('settings.get').then(view => { if (active) applyView(view) }).catch(reason => { if (active) setError(messageOf(reason)) })
+      return () => { active = false }
+    }, [])
 
     const setTerminalRemote = async (enabled: boolean): Promise<void> => {
       const previous = terminalEnabled
@@ -245,112 +146,141 @@ export function createRemotePluginOptions(React: ClientReact) {
 
     if (props.view === 'summary') return React.createElement('span', null, t('pluginDescription'))
 
-    return React.createElement(props.view === 'page' ? 'div' : 'li', { className: `dshRemotePluginCard${open ? ' isOpen' : ''}${props.view === 'page' ? ' dshRemotePluginModern' : ''}` },
+    return React.createElement('div', { className: 'dshRemotePluginCard dshRemotePluginModern isOpen' },
       React.createElement('div', { className: 'dshRemotePluginCardHeader' },
-        React.createElement('button', {
-          type: 'button',
-          className: 'dshRemotePluginCardToggle',
-          'aria-expanded': open,
-          'aria-label': t(open ? 'collapseSettings' : 'expandSettings', { name: t('pluginTitle') }),
-          onClick: () => setOpen(current => !current),
-        },
-          React.createElement('span', { className: 'dshRemotePluginCardHeading' },
-            React.createElement('strong', null, t('pluginTitle')),
-            React.createElement('span', null, t('pluginDescription'))),
-          association === undefined ? null : React.createElement('span', {
-            className: `dshRemotePluginCardStatus${connectionStatusClass(hostStatus)}`,
-          }, hostStatus === undefined ? t('associated') : connectionStatusLabel(hostStatus, t)),
-          React.createElement('span', { className: 'dshRemotePluginCardChevron', 'aria-hidden': true }, '⌄'))),
-      !open ? null : React.createElement('div', { className: 'dshRemotePluginCardBody' },
-        !loaded
-          ? React.createElement('p', { className: 'dshRemoteSettingsState' }, error ?? t('loadingSettings'))
-          : association !== undefined
-            ? React.createElement('div', { className: 'dshRemoteSettings' },
-              React.createElement('div', { className: 'dshRemoteSettingsTop' },
-                React.createElement('div', { className: 'dshRemoteAssociation' },
-                  React.createElement('span', null, t(association.account === undefined ? 'authorization' : 'account')),
-                  React.createElement('strong', null, association.account
-                    ?? t('authorizationComplete')),
-                  React.createElement('p', null, association.account === undefined
-                    ? serverUrl
-                    : t('authorizedOn', { role: 'Remote', serverUrl })))),
-              React.createElement('div', { className: 'dshRemoteHostIdentity' },
-                React.createElement('div', null,
-                  React.createElement('span', null, t('hostName')),
-                  React.createElement('strong', null, hostName || '—')),
-                React.createElement('div', null,
-                  React.createElement('span', null, t('deviceId')),
-                  React.createElement('code', null, hostDeviceId || '—'))),
-              developmentSetting,
-              acpSetting,
-              React.createElement('div', { className: 'dshRemoteAuthorizationSetting' },
-                React.createElement('div', null,
-                  React.createElement('strong', null, t('allowControlCurrentDevice')),
-                  React.createElement('p', null, t('thisMachineHost'))),
-                React.createElement('input', {
-                  type: 'checkbox', role: 'switch', disabled: busy,
-                  'aria-label': t('allowControlCurrentDevice'),
-                  checked: hostStatus?.authorized === true,
-                  onChange: (event: Event) => void setCurrentDeviceControl((event.target as HTMLInputElement).checked),
-                })),
-              React.createElement('div', { className: 'dshRemoteConnection', 'aria-live': 'polite' },
-                React.createElement('div', { className: 'dshRemoteConnectionSummary' },
-                  React.createElement('span', null, t('connection')),
-                  React.createElement('strong', null,
-                    React.createElement('span', {
-                      className: `dshRemoteConnectionDot${connectionStatusClass(hostStatus)}`,
-                      'aria-hidden': true,
-                    }),
-                    connectionStatusLabel(hostStatus, t)),
-                  React.createElement('p', null, hostStatus === undefined
-                    ? t('checkingConnection')
-                    : hostStatus.lastActiveAt === undefined
-                      ? t('neverConnected')
-                      : t('lastActive', { time: formatLocalTime(hostStatus.lastActiveAt) }))),
-                React.createElement('button', {
-                  type: 'button',
-                  className: 'dshRemoteReconnect',
-                  disabled: reconnectBusy || hostStatus?.configured === false,
-                  onClick: () => void reconnectHost(),
-                }, t(reconnectBusy ? 'reconnectingAction' : 'reconnect'))),
-              hostStatus?.error === undefined || hostStatus.online
-                ? null
-                : React.createElement('p', { className: 'dshRemoteConnectionIssue', role: 'status' }, connectionErrorMessage(hostStatus.error, t)),
-              !writable ? React.createElement('p', { className: 'dshRemoteError' }, t('readOnly')) : null,
-              React.createElement('div', { className: 'dshRemoteSettingsFooter' },
-                React.createElement('p', {
-                  className: error !== undefined ? 'dshRemoteError' : 'dshRemoteNotice',
-                  role: error !== undefined ? 'alert' : 'status',
-                }, error ?? (notice === undefined ? '' : t(notice.key, notice.params))),
-                React.createElement('button', {
-                  type: 'button',
-                  className: 'dshRemoteDiscard',
-                  disabled: busy || !writable,
-                  onClick: () => void logout(),
-                }, t(busy ? 'signingOut' : 'signOut'))))
-            : React.createElement('div', { className: 'dshRemoteSettings' },
-              React.createElement('div', { className: 'dshRemoteHostIdentity' },
-                React.createElement('div', null,
-                  React.createElement('span', null, t('hostName')),
-                  React.createElement('strong', null, hostName || '—')),
-                React.createElement('div', null,
-                  React.createElement('span', null, t('deviceId')),
-                  React.createElement('code', null, hostDeviceId || '—'))),
-              developmentSetting,
-              acpSetting,
-              React.createElement('div', { className: 'dshRemoteSettingsSignIn' },
-                React.createElement('p', { className: 'dshRemoteSettingsState' }, t('authorizeFromRemote')),
-                React.createElement('button', {
-                  type: 'button', className: 'dshRemoteSave', disabled: busy || !loaded,
-                  onClick: props.onSignIn,
-                }, t('signInAccount'))),
-              !writable ? React.createElement('p', { className: 'dshRemoteError' }, t('readOnly')) : null,
-              error !== undefined || notice !== undefined ? React.createElement('div', { className: 'dshRemoteSettingsFooter' },
-                React.createElement('p', {
-                  className: error !== undefined ? 'dshRemoteError' : 'dshRemoteNotice',
-                  role: error !== undefined ? 'alert' : 'status',
-                }, error ?? t(notice!.key, notice!.params))) : null)))
+        React.createElement('strong', null, t('lanTitle'))),
+      React.createElement('div', { className: 'dshRemotePluginCardBody' },
+        React.createElement(LanSettingsPanel, { control: props.control, t }),
+        loaded ? developmentSetting : null,
+        loaded ? acpSetting : null,
+        error === undefined && notice === undefined ? null : React.createElement('p', { className: error === undefined ? 'dshRemoteNotice' : 'dshRemoteError', role: error === undefined ? 'status' : 'alert' }, error ?? t(notice!.key, notice!.params))))
   }
 
+  const LanSettingsPanel = createLanSettingsPanel(React)
   return RemotePluginOptions
+}
+
+interface LanHost { id: string; name: string; host: string; port: number; accessToken?: string }
+interface LanSettingsView {
+  interfaces?: Array<{ name: string; address: string; family: string; internal: boolean }>
+  config: { enabled: boolean; bindAddress: string; port: number; accessToken: string; hosts: LanHost[] }
+  writable: boolean
+}
+
+export function createLanSettingsPanel(React: ClientReact) {
+  return function LanSettingsPanel(props: {
+    control: <T>(endpoint: string, payload?: unknown) => Promise<T>
+    t: Translate
+    onChanged?: () => Promise<void>
+    onConnect?: (id: string) => Promise<void>
+  }): unknown {
+    const { t } = props
+    const [view, setView] = React.useState<LanSettingsView | undefined>(undefined)
+    const [busy, setBusy] = React.useState(false)
+    const [error, setError] = React.useState<string | undefined>(undefined)
+    const [notice, setNotice] = React.useState(false)
+    const [editing, setEditing] = React.useState<LanHost | undefined>(undefined)
+    const [deleting, setDeleting] = React.useState<string | undefined>(undefined)
+    const [name, setName] = React.useState('')
+    const [host, setHost] = React.useState('')
+    const [port, setPort] = React.useState('')
+    const [token, setToken] = React.useState('')
+    const [listenerTokenVisible, setListenerTokenVisible] = React.useState(false)
+    const load = async (): Promise<void> => {
+      try { setView(await props.control<LanSettingsView>('lan.settings.get')); setError(undefined) }
+      catch { setError(t('lanLoadFailed')) }
+    }
+    React.useEffect(() => { void load() }, [])
+    const validPort = (value: string): boolean => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535
+    const save = async (patch: Partial<LanSettingsView['config']>): Promise<boolean> => {
+      setBusy(true); setError(undefined); setNotice(false)
+      try {
+        await props.control('lan.settings.set', patch)
+        setView(await props.control<LanSettingsView>('lan.settings.get'))
+        setNotice(true)
+        await props.onChanged?.()
+        return true
+      } catch (reason) { setError(messageOf(reason)); return false }
+      finally { setBusy(false) }
+    }
+    const editHost = (entry?: LanHost): void => {
+      setEditing(entry); setName(entry?.name ?? ''); setHost(entry?.host ?? '')
+      setPort(entry === undefined ? '' : String(entry.port)); setToken(entry?.accessToken ?? '')
+      setError(undefined); setNotice(false)
+    }
+    const submitHost = async (connect = false): Promise<void> => {
+      if (view === undefined) return
+      const address = host.trim()
+      if (!address || /[\s/?#@]/.test(address) || address.includes('://')) { setError(t('lanInvalidAddress')); return }
+      if (!validPort(port)) { setError(t('lanInvalidPort')); return }
+      if (token !== '' && token.trim().length < 16) { setError(t('lanTokenTooShort')); return }
+      const entry: LanHost = { id: editing?.id ?? crypto.randomUUID(), name: name.trim() || address, host: address, port: Number(port), ...(token === '' ? {} : { accessToken: token }) }
+      if (await save({ hosts: editing === undefined ? [...view.config.hosts, entry] : view.config.hosts.map(item => item.id === entry.id ? entry : item) })) {
+        setEditing(undefined); setName(''); setHost(''); setPort(''); setToken('')
+        if (connect) { try { await props.onConnect?.(entry.id) } catch (reason) { setError(messageOf(reason)) } }
+      }
+    }
+    const field = (label: string, value: string, change: (value: string) => void, type = 'text'): unknown => React.createElement('label', null,
+      React.createElement('span', null, label), React.createElement('input', {
+        type, value, disabled: busy || !view?.writable, autoComplete: 'off',
+        onChange: (event: Event) => change((event.target as HTMLInputElement).value),
+      }))
+    if (view === undefined) return React.createElement('div', { className: 'dshLanSettings' },
+      error === undefined ? React.createElement('span', { role: 'progressbar', 'aria-label': t('loadingSettings') }) : React.createElement('div', null,
+        React.createElement('p', { role: 'alert' }, error), React.createElement('button', { type: 'button', onClick: () => void load() }, t('refreshRemoteShort'))))
+    const config = view.config
+    const update = (patch: Partial<LanSettingsView['config']>): void => setView({ ...view, config: { ...config, ...patch } })
+    const bindOptions: { address: string; label: string; disabled?: boolean }[] = [
+      { address: '0.0.0.0', label: t('lanAllIpv4') },
+      ...(view.interfaces ?? [])
+        .filter(item => item.family === 'IPv4' && !item.internal && !item.address.startsWith('127.'))
+        .map(item => ({ address: item.address, label: `${item.name} · ${item.address} · ${item.family}` })),
+    ]
+    if (!bindOptions.some(item => item.address === config.bindAddress)) {
+      bindOptions.push({ address: config.bindAddress, label: `${config.bindAddress} · ${t('lanUnavailableAddress')}`, disabled: true })
+    }
+    return React.createElement('section', { className: 'dshLanSettings' },
+      React.createElement('style', null, lanStyles),
+      React.createElement('p', null, t('lanDirectHint')),
+      React.createElement('ul', null, config.hosts.map(entry => React.createElement('li', { className: 'dshLanRow', key: entry.id },
+        React.createElement('span', null, React.createElement('strong', null, entry.name), ' · ', `${entry.host}:${entry.port}`),
+        deleting === entry.id ? React.createElement('div', { className: 'dshLanActions' },
+          React.createElement('span', null, t('lanDeleteConfirm', { name: entry.name })),
+          React.createElement('button', { type: 'button', disabled: busy || !view.writable, onClick: () => void save({ hosts: config.hosts.filter(item => item.id !== entry.id) }).then(ok => { if (ok) setDeleting(undefined) }) }, t('lanDeleteHost')),
+          React.createElement('button', { type: 'button', disabled: busy, onClick: () => setDeleting(undefined) }, t('lanCancel')))
+          : React.createElement('div', { className: 'dshLanActions' },
+            React.createElement('button', { type: 'button', disabled: busy || !view.writable, onClick: () => editHost(entry) }, t('lanEditHost')),
+            React.createElement('button', { type: 'button', disabled: busy || !view.writable, onClick: () => setDeleting(entry.id) }, t('lanDeleteHost')))))),
+      React.createElement('form', { onSubmit: (event: Event) => { event.preventDefault(); void submitHost() } },
+        React.createElement('strong', null, t(editing === undefined ? 'lanAddHost' : 'lanEditHost')),
+        field(t('lanHostName'), name, setName),
+        React.createElement('div', { className: 'dshLanFields' }, field(t('lanHostAddress'), host, setHost), field(t('lanPort'), port, setPort, 'number')),
+        field(t('lanOptionalToken'), token, setToken, 'password'),
+        React.createElement('div', { className: 'dshLanActions' },
+          React.createElement('button', { type: 'submit', disabled: busy || !view.writable || host.trim() === '' }, t(busy ? 'saving' : 'save')),
+          props.onConnect === undefined ? null : React.createElement('button', { type: 'button', disabled: busy || !view.writable || host.trim() === '', onClick: () => void submitHost(true) }, t('lanConnect')),
+          editing === undefined ? null : React.createElement('button', { type: 'button', disabled: busy, onClick: () => editHost() }, t('lanCancel')))),
+      React.createElement('details', null, React.createElement('summary', null, t('lanListener')),
+        React.createElement('div', { className: 'dshLanListener' },
+          React.createElement('p', null, t('lanListenHint')),
+          React.createElement('label', null, t('lanListener'), React.createElement('input', { type: 'checkbox', role: 'switch', 'aria-checked': config.enabled, checked: config.enabled, disabled: busy || !view.writable, onChange: (event: Event) => update({ enabled: (event.target as HTMLInputElement).checked }) })),
+          React.createElement('div', { className: 'dshLanFields' },
+            React.createElement('label', null, React.createElement('span', null, t('lanBindAddress')),
+              React.createElement('select', { value: config.bindAddress, disabled: busy || !view.writable,
+                onChange: (event: Event) => update({ bindAddress: (event.target as HTMLSelectElement).value }) },
+              ...bindOptions.map((item, index) => React.createElement('option', { key: `${index}:${item.address}`, value: item.address, disabled: item.disabled }, item.label)))),
+            field(t('lanPort'), String(config.port), value => update({ port: Number(value) }), 'number')),
+          React.createElement('p', null, t('lanAddressSelectionHint')),
+          field(t('lanAccessToken'), config.accessToken, value => update({ accessToken: value }), listenerTokenVisible ? 'text' : 'password'),
+          React.createElement('div', { className: 'dshLanActions' },
+            React.createElement('button', { type: 'button', 'aria-pressed': listenerTokenVisible, onClick: () => setListenerTokenVisible(current => !current) }, t(listenerTokenVisible ? 'lanHideToken' : 'lanShowToken'))),
+          React.createElement('p', null, t('lanListenerTokenHint')),
+          React.createElement('button', { type: 'button', disabled: busy || !view.writable, onClick: () => {
+            if (!validPort(String(config.port))) { setError(t('lanInvalidPort')); return }
+            if (config.accessToken !== '' && config.accessToken.trim().length < 16) { setError(t('lanTokenTooShort')); return }
+            void save({ enabled: config.enabled, bindAddress: config.bindAddress.trim(), port: config.port, accessToken: config.accessToken })
+          } }, t('lanSaveListener')))),
+      !view.writable ? React.createElement('p', null, t('readOnly')) : null,
+      React.createElement('p', { className: error === undefined ? 'dshRemoteNotice' : 'dshRemoteError', role: error === undefined ? 'status' : 'alert', 'aria-live': 'polite' }, error ?? (notice ? t('lanSaved') : '')))
+  }
 }

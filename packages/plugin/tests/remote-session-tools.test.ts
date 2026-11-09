@@ -104,7 +104,7 @@ describe('Native Remote session tool boundaries', () => {
     expect(await f.tools.run('remote_interrupt_session', { ...target, operationId: 'interrupt_0000001' }, signal())).toMatchObject({ status: 'accepted' })
     expect(f.dispatch.mock.calls[1]?.slice(0, 2)).toEqual(['session/cancel', { args: { request: { sessionId: 'session' } } }])
     const definitions = remoteSessionTools(() => ({ runSessionTool: f.tools.run.bind(f.tools) }))
-    const send = definitions.find(tool => tool.name === 'remote_send_message')!
+    const send = definitions.find(tool => tool.name === 'lan_send_message')!
     for (const extra of [{ backend: 'codex' }, { permissionPreset: 'danger-full-access' }, { cwd: '/outside' }, { method: 'settings/update' }]) {
       await expect(send.execute({ ...target, operationId, message: 'task', ...extra }, { signal: signal() })).rejects.toThrow()
     }

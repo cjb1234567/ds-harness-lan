@@ -3,14 +3,13 @@ import type { RemoteMessage } from '@dsh-remote/protocol'
 export interface AuthenticatedPeerChannel {
   /**
    * Attestation supplied by the Noise/control-plane integration. Implementors
-   * must expose this channel only after both the Noise IK transcript and the
-   * Server membership for this exact connection have been verified.
+   * must expose this channel only after the Noise IK transcript and either
+   * account membership or explicit local LAN token pairing have been verified.
    */
   readonly security: {
     protocol: 'Noise_IK_25519_ChaChaPoly_SHA256'
     connectionId: string
-    membershipId: string
-  }
+  } & ({ kind: 'local-pairing'; membershipId?: never } | { kind?: 'account'; membershipId: string })
   readonly peerDeviceId: string
   readonly peerIdentityKey: string
   readonly mode?: 'LAN' | 'P2P' | 'TURN' | 'Relay'

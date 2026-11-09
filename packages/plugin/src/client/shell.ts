@@ -9,7 +9,7 @@ export function installStyle(clientModuleId: string): () => void {
   style.textContent = [
     // Browser navigation still targets the Desktop machine until Harness exposes
     // a Remote URL resolver. Hide the native guide entry in Remote mode only.
-    'html.dshRemoteBrowserUnavailable [data-sidebar-right-guide-entry="browser"]{display:none!important}',
+    'html.dshLanBrowserUnavailable [data-sidebar-right-guide-entry="browser"]{display:none!important}',
     'html.dshRemoteTargetActive button[aria-label="添加工作区"],html.dshRemoteTargetActive button[aria-label="Add workspace"]{display:none!important}',
     'html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="指令"],html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="Commands"]{display:none!important}',
     '[data-dsh-remote-hidden-action]{display:none!important}',

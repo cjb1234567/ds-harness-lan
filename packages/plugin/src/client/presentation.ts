@@ -1,7 +1,7 @@
 import type { LocaleKey, Translate } from '../client-locale.js'
 import type { RemoteConnectionProgress, RemoteStatus, RemoteTransportPreference } from './types.js'
 
-const defaultPreferredTransports: readonly RemoteTransportPreference[] = ['lan', 'p2p', 'turn', 'relay']
+const defaultPreferredTransports: readonly RemoteTransportPreference[] = ['lan']
 
 function normalizedPreferredTransports(value: readonly RemoteTransportPreference[] | undefined): RemoteTransportPreference[] {
   return value === undefined || value.length === 0 ? [...defaultPreferredTransports] : [...value]
@@ -146,10 +146,13 @@ export function observedConnectionProgress(
 }
 
 export function connectionErrorMessage(code: string, t: Translate): string {
-  if (code === 'ACCOUNT_AUTH_REQUIRED') return t('hostSignInHint')
-  if (code === 'AUTH_REQUIRED') return t('hostSignInHint')
+  if (code === 'LAN_HOST_NOT_FOUND') return t('lanNoHosts')
+  if (code === 'LAN_CONNECTION_FAILED') return t('connectionReachability')
+  if (code === 'LAN_AUTH_INVALID') return t('lanTokenInvalid')
+  if (code === 'ACCOUNT_AUTH_REQUIRED') return t('connectionReachability')
+  if (code === 'AUTH_REQUIRED') return t('lanTokenInvalid')
   if (code === 'AUTH_INVALID' || code === 'TOKEN_EXPIRED') {
-    return t('connectionAuthorizationExpired')
+    return t('lanTokenInvalid')
   }
   if (code === 'CONNECTION_REPLACED') return t('connectionReplaced')
   if (code === 'SERVER_CREDENTIALS_BUSY') return t('connectionCredentialsBusy')

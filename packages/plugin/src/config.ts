@@ -1,4 +1,5 @@
 import { hostname } from 'node:os'
+import { isIP } from 'node:net'
 import type { Volatile, VolatileSnapshot } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
@@ -14,6 +15,17 @@ export interface Config {
   remoteTools?: { enabled?: boolean }
   hostControl?: { enabled?: boolean }
   loopback?: { ports?: number[] }
+  lan?: {
+    enabled?: boolean
+    bindAddress?: string
+    port?: number
+    accessToken?: string
+    connectTimeoutMs?: number
+    handshakeTimeoutMs?: number
+    heartbeatIntervalMs?: number
+    maxConnections?: number
+    hosts?: Array<{ id: string; name: string; host: string; port: number; accessToken?: string }>
+  }
   forceRelay?: boolean
   /**
    * When a known peer device presents a NEW identity key after re-authorizing with the
@@ -64,6 +76,18 @@ export interface ResolvedAcpConfig {
   backends: ResolvedAcpBackendConfig[]
 }
 
+export interface ResolvedLanConfig {
+  enabled: boolean
+  bindAddress: string
+  port: number
+  accessToken: string
+  connectTimeoutMs: number
+  handshakeTimeoutMs: number
+  heartbeatIntervalMs: number
+  maxConnections: number
+  hosts: Array<{ id: string; name: string; host: string; port: number; accessToken?: string }>
+}
+
 export interface ResolvedConfig {
   enabled: boolean
   role: 'host' | 'client' | 'both'
@@ -82,6 +106,7 @@ export interface ResolvedConfig {
   remoteTools?: { enabled: boolean }
   hostControl?: { enabled: boolean }
   loopback: { ports: number[] }
+  lan: ResolvedLanConfig
   codex: ResolvedCodexConfig
   cursor: ResolvedCursorConfig
   acp?: ResolvedAcpConfig
@@ -110,6 +135,19 @@ const entryConfigSchema = s.object({
   remoteTools: s.object({ enabled: s.boolean() }),
   hostControl: s.object({ enabled: s.boolean() }),
   loopback: s.object({ ports: s.array(s.number()) }),
+  lan: s.object({
+    enabled: s.boolean(),
+    bindAddress: s.string(),
+    port: s.number(),
+    accessToken: s.string(),
+    connectTimeoutMs: s.number(),
+    handshakeTimeoutMs: s.number(),
+    heartbeatIntervalMs: s.number(),
+    maxConnections: s.number(),
+    hosts: s.array(s.object({
+      id: s.string(), name: s.string(), host: s.string(), port: s.number(), accessToken: s.string(),
+    })),
+  }),
   forceRelay: s.boolean(),
   rotatePinnedPeerKey: s.boolean(),
   logLevel: s.union(['debug', 'info', 'warn', 'error'] as const),
@@ -156,6 +194,39 @@ const reconnectSchema = z.union([
   }).strict(),
 ])
 
+const lanIpSchema = z.string().refine(value => isIP(value) !== 0, 'must be an IPv4 or IPv6 address')
+const lanPortSchema = z.number().int().min(1).max(65535)
+const lanTokenSchema = z.string().refine(value => value.trim().length >= 16, 'accessToken must contain at least 16 non-padding characters')
+const lanSchema = z.object({
+  enabled: z.boolean().optional(),
+  bindAddress: lanIpSchema.optional(),
+  port: lanPortSchema.optional(),
+  accessToken: z.string().optional(),
+  connectTimeoutMs: z.number().int().positive().optional(),
+  handshakeTimeoutMs: z.number().int().positive().optional(),
+  heartbeatIntervalMs: z.number().int().positive().optional(),
+  maxConnections: z.number().int().positive().optional(),
+  hosts: z.array(z.object({
+    id: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    host: lanIpSchema,
+    port: lanPortSchema,
+    accessToken: lanTokenSchema.optional(),
+  }).strict()).superRefine((hosts, ctx) => {
+    const ids = new Set<string>()
+    hosts.forEach((host, index) => {
+      if (ids.has(host.id)) {
+        ctx.addIssue({ code: 'custom', path: [index, 'id'], message: 'LAN host ids must be unique' })
+      }
+      ids.add(host.id)
+    })
+  }).optional(),
+}).strict().superRefine((lan, ctx) => {
+  if (lan.enabled && !lanTokenSchema.safeParse(lan.accessToken).success) {
+    ctx.addIssue({ code: 'custom', path: ['accessToken'], message: 'lan.accessToken must contain at least 16 non-padding characters when LAN is enabled' })
+  }
+})
+
 const configSchema = z.object({
   enabled: z.boolean().optional(),
   role: z.enum(['host', 'client', 'both']).optional(),
@@ -165,6 +236,7 @@ const configSchema = z.object({
   remoteTools: z.object({ enabled: z.boolean().optional() }).strict().optional(),
   hostControl: z.object({ enabled: z.boolean().optional() }).strict().optional(),
   loopback: z.object({ ports: z.array(z.number().int().min(1024).max(65535)).max(16).optional() }).strict().optional(),
+  lan: lanSchema.optional(),
   forceRelay: z.boolean().optional(),
   rotatePinnedPeerKey: z.boolean().optional(),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
@@ -208,6 +280,17 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
     terminal: { enabled: parsed.terminal?.enabled ?? (env.DSH_REMOTE_TERMINAL_ENABLED === undefined || env.DSH_REMOTE_TERMINAL_ENABLED === 'true') },
     remoteTools: { enabled: parsed.remoteTools?.enabled ?? true },
     loopback: { ports: [...new Set(parsed.loopback?.ports ?? [])] },
+    lan: {
+      enabled: parsed.lan?.enabled ?? false,
+      bindAddress: parsed.lan?.bindAddress ?? '0.0.0.0',
+      port: parsed.lan?.port ?? 59090,
+      accessToken: parsed.lan?.accessToken ?? '',
+      connectTimeoutMs: parsed.lan?.connectTimeoutMs ?? 10_000,
+      handshakeTimeoutMs: parsed.lan?.handshakeTimeoutMs ?? 10_000,
+      heartbeatIntervalMs: parsed.lan?.heartbeatIntervalMs ?? 25_000,
+      maxConnections: parsed.lan?.maxConnections ?? 32,
+      hosts: parsed.lan?.hosts ?? [],
+    },
     forceRelay: parsed.forceRelay ?? false,
     rotatePinnedPeerKey: parsed.rotatePinnedPeerKey ?? false,
     logLevel: parsed.logLevel ?? 'info',
@@ -247,6 +330,12 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
       }),
     },
   }
+}
+
+/** Validate untrusted LAN configuration and apply the same defaults as the entry config. */
+export function parseLanConfig(input: unknown): ResolvedLanConfig {
+  const parsed = lanSchema.parse(input)
+  return resolveConfig({ lan: parsed }, {}).lan
 }
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])

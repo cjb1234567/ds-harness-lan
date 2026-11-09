@@ -67,7 +67,7 @@ export class IdentityStore {
   constructor(options: IdentityStoreOptions = {}) {
     const env = options.env ?? process.env
     const dshHome = env.DSH_HOME || join(options.homeDirectory ?? homedir(), '.dsh')
-    this.directory = options.directory ?? join(dshHome, 'remote')
+    this.directory = options.directory ?? join(dshHome, 'lan')
   }
 
   async loadOrCreate(deviceName: string): Promise<HostIdentity> {

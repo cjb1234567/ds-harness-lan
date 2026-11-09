@@ -1,1626 +1,41 @@
 "use strict";
 (() => {
-  var __create = Object.create;
-  var __defProp = Object.defineProperty;
-  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __getProtoOf = Object.getPrototypeOf, __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __commonJS = (cb, mod) => function() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  };
-  var __copyProps = (to, from, except, desc) => {
-    if (from && typeof from == "object" || typeof from == "function")
-      for (let key of __getOwnPropNames(from))
-        !__hasOwnProp.call(to, key) && key !== except && __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-    return to;
-  };
-  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-    // If the importer is in node compatibility mode or this is not an ESM
-    // file that has been converted to a CommonJS file using a Babel-
-    // compatible transform (i.e. "__esModule" has not been set), then set
-    // "default" to the CommonJS "module.exports" for node compatibility.
-    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: !0 }) : target,
-    mod
-  ));
-
-  // node_modules/qrcode/lib/can-promise.js
-  var require_can_promise = __commonJS({
-    "node_modules/qrcode/lib/can-promise.js"(exports, module) {
-      module.exports = function() {
-        return typeof Promise == "function" && Promise.prototype && Promise.prototype.then;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/utils.js
-  var require_utils = __commonJS({
-    "node_modules/qrcode/lib/core/utils.js"(exports) {
-      var toSJISFunction, CODEWORDS_COUNT = [
-        0,
-        // Not used
-        26,
-        44,
-        70,
-        100,
-        134,
-        172,
-        196,
-        242,
-        292,
-        346,
-        404,
-        466,
-        532,
-        581,
-        655,
-        733,
-        815,
-        901,
-        991,
-        1085,
-        1156,
-        1258,
-        1364,
-        1474,
-        1588,
-        1706,
-        1828,
-        1921,
-        2051,
-        2185,
-        2323,
-        2465,
-        2611,
-        2761,
-        2876,
-        3034,
-        3196,
-        3362,
-        3532,
-        3706
-      ];
-      exports.getSymbolSize = function(version) {
-        if (!version) throw new Error('"version" cannot be null or undefined');
-        if (version < 1 || version > 40) throw new Error('"version" should be in range from 1 to 40');
-        return version * 4 + 17;
-      };
-      exports.getSymbolTotalCodewords = function(version) {
-        return CODEWORDS_COUNT[version];
-      };
-      exports.getBCHDigit = function(data) {
-        let digit = 0;
-        for (; data !== 0; )
-          digit++, data >>>= 1;
-        return digit;
-      };
-      exports.setToSJISFunction = function(f) {
-        if (typeof f != "function")
-          throw new Error('"toSJISFunc" is not a valid function.');
-        toSJISFunction = f;
-      };
-      exports.isKanjiModeEnabled = function() {
-        return typeof toSJISFunction < "u";
-      };
-      exports.toSJIS = function(kanji) {
-        return toSJISFunction(kanji);
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/error-correction-level.js
-  var require_error_correction_level = __commonJS({
-    "node_modules/qrcode/lib/core/error-correction-level.js"(exports) {
-      exports.L = { bit: 1 };
-      exports.M = { bit: 0 };
-      exports.Q = { bit: 3 };
-      exports.H = { bit: 2 };
-      function fromString(string) {
-        if (typeof string != "string")
-          throw new Error("Param is not a string");
-        switch (string.toLowerCase()) {
-          case "l":
-          case "low":
-            return exports.L;
-          case "m":
-          case "medium":
-            return exports.M;
-          case "q":
-          case "quartile":
-            return exports.Q;
-          case "h":
-          case "high":
-            return exports.H;
-          default:
-            throw new Error("Unknown EC Level: " + string);
-        }
-      }
-      exports.isValid = function(level) {
-        return level && typeof level.bit < "u" && level.bit >= 0 && level.bit < 4;
-      };
-      exports.from = function(value, defaultValue) {
-        if (exports.isValid(value))
-          return value;
-        try {
-          return fromString(value);
-        } catch {
-          return defaultValue;
-        }
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/bit-buffer.js
-  var require_bit_buffer = __commonJS({
-    "node_modules/qrcode/lib/core/bit-buffer.js"(exports, module) {
-      function BitBuffer() {
-        this.buffer = [], this.length = 0;
-      }
-      BitBuffer.prototype = {
-        get: function(index) {
-          let bufIndex = Math.floor(index / 8);
-          return (this.buffer[bufIndex] >>> 7 - index % 8 & 1) === 1;
-        },
-        put: function(num, length) {
-          for (let i = 0; i < length; i++)
-            this.putBit((num >>> length - i - 1 & 1) === 1);
-        },
-        getLengthInBits: function() {
-          return this.length;
-        },
-        putBit: function(bit) {
-          let bufIndex = Math.floor(this.length / 8);
-          this.buffer.length <= bufIndex && this.buffer.push(0), bit && (this.buffer[bufIndex] |= 128 >>> this.length % 8), this.length++;
-        }
-      };
-      module.exports = BitBuffer;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/bit-matrix.js
-  var require_bit_matrix = __commonJS({
-    "node_modules/qrcode/lib/core/bit-matrix.js"(exports, module) {
-      function BitMatrix(size) {
-        if (!size || size < 1)
-          throw new Error("BitMatrix size must be defined and greater than 0");
-        this.size = size, this.data = new Uint8Array(size * size), this.reservedBit = new Uint8Array(size * size);
-      }
-      BitMatrix.prototype.set = function(row, col, value, reserved) {
-        let index = row * this.size + col;
-        this.data[index] = value, reserved && (this.reservedBit[index] = !0);
-      };
-      BitMatrix.prototype.get = function(row, col) {
-        return this.data[row * this.size + col];
-      };
-      BitMatrix.prototype.xor = function(row, col, value) {
-        this.data[row * this.size + col] ^= value;
-      };
-      BitMatrix.prototype.isReserved = function(row, col) {
-        return this.reservedBit[row * this.size + col];
-      };
-      module.exports = BitMatrix;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/alignment-pattern.js
-  var require_alignment_pattern = __commonJS({
-    "node_modules/qrcode/lib/core/alignment-pattern.js"(exports) {
-      var getSymbolSize = require_utils().getSymbolSize;
-      exports.getRowColCoords = function(version) {
-        if (version === 1) return [];
-        let posCount = Math.floor(version / 7) + 2, size = getSymbolSize(version), intervals = size === 145 ? 26 : Math.ceil((size - 13) / (2 * posCount - 2)) * 2, positions = [size - 7];
-        for (let i = 1; i < posCount - 1; i++)
-          positions[i] = positions[i - 1] - intervals;
-        return positions.push(6), positions.reverse();
-      };
-      exports.getPositions = function(version) {
-        let coords = [], pos = exports.getRowColCoords(version), posLength = pos.length;
-        for (let i = 0; i < posLength; i++)
-          for (let j = 0; j < posLength; j++)
-            i === 0 && j === 0 || // top-left
-            i === 0 && j === posLength - 1 || // bottom-left
-            i === posLength - 1 && j === 0 || coords.push([pos[i], pos[j]]);
-        return coords;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/finder-pattern.js
-  var require_finder_pattern = __commonJS({
-    "node_modules/qrcode/lib/core/finder-pattern.js"(exports) {
-      var getSymbolSize = require_utils().getSymbolSize, FINDER_PATTERN_SIZE = 7;
-      exports.getPositions = function(version) {
-        let size = getSymbolSize(version);
-        return [
-          // top-left
-          [0, 0],
-          // top-right
-          [size - FINDER_PATTERN_SIZE, 0],
-          // bottom-left
-          [0, size - FINDER_PATTERN_SIZE]
-        ];
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/mask-pattern.js
-  var require_mask_pattern = __commonJS({
-    "node_modules/qrcode/lib/core/mask-pattern.js"(exports) {
-      exports.Patterns = {
-        PATTERN000: 0,
-        PATTERN001: 1,
-        PATTERN010: 2,
-        PATTERN011: 3,
-        PATTERN100: 4,
-        PATTERN101: 5,
-        PATTERN110: 6,
-        PATTERN111: 7
-      };
-      var PenaltyScores = {
-        N1: 3,
-        N2: 3,
-        N3: 40,
-        N4: 10
-      };
-      exports.isValid = function(mask) {
-        return mask != null && mask !== "" && !isNaN(mask) && mask >= 0 && mask <= 7;
-      };
-      exports.from = function(value) {
-        return exports.isValid(value) ? parseInt(value, 10) : void 0;
-      };
-      exports.getPenaltyN1 = function(data) {
-        let size = data.size, points = 0, sameCountCol = 0, sameCountRow = 0, lastCol = null, lastRow = null;
-        for (let row = 0; row < size; row++) {
-          sameCountCol = sameCountRow = 0, lastCol = lastRow = null;
-          for (let col = 0; col < size; col++) {
-            let module2 = data.get(row, col);
-            module2 === lastCol ? sameCountCol++ : (sameCountCol >= 5 && (points += PenaltyScores.N1 + (sameCountCol - 5)), lastCol = module2, sameCountCol = 1), module2 = data.get(col, row), module2 === lastRow ? sameCountRow++ : (sameCountRow >= 5 && (points += PenaltyScores.N1 + (sameCountRow - 5)), lastRow = module2, sameCountRow = 1);
-          }
-          sameCountCol >= 5 && (points += PenaltyScores.N1 + (sameCountCol - 5)), sameCountRow >= 5 && (points += PenaltyScores.N1 + (sameCountRow - 5));
-        }
-        return points;
-      };
-      exports.getPenaltyN2 = function(data) {
-        let size = data.size, points = 0;
-        for (let row = 0; row < size - 1; row++)
-          for (let col = 0; col < size - 1; col++) {
-            let last = data.get(row, col) + data.get(row, col + 1) + data.get(row + 1, col) + data.get(row + 1, col + 1);
-            (last === 4 || last === 0) && points++;
-          }
-        return points * PenaltyScores.N2;
-      };
-      exports.getPenaltyN3 = function(data) {
-        let size = data.size, points = 0, bitsCol = 0, bitsRow = 0;
-        for (let row = 0; row < size; row++) {
-          bitsCol = bitsRow = 0;
-          for (let col = 0; col < size; col++)
-            bitsCol = bitsCol << 1 & 2047 | data.get(row, col), col >= 10 && (bitsCol === 1488 || bitsCol === 93) && points++, bitsRow = bitsRow << 1 & 2047 | data.get(col, row), col >= 10 && (bitsRow === 1488 || bitsRow === 93) && points++;
-        }
-        return points * PenaltyScores.N3;
-      };
-      exports.getPenaltyN4 = function(data) {
-        let darkCount = 0, modulesCount = data.data.length;
-        for (let i = 0; i < modulesCount; i++) darkCount += data.data[i];
-        return Math.abs(Math.ceil(darkCount * 100 / modulesCount / 5) - 10) * PenaltyScores.N4;
-      };
-      function getMaskAt(maskPattern, i, j) {
-        switch (maskPattern) {
-          case exports.Patterns.PATTERN000:
-            return (i + j) % 2 === 0;
-          case exports.Patterns.PATTERN001:
-            return i % 2 === 0;
-          case exports.Patterns.PATTERN010:
-            return j % 3 === 0;
-          case exports.Patterns.PATTERN011:
-            return (i + j) % 3 === 0;
-          case exports.Patterns.PATTERN100:
-            return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0;
-          case exports.Patterns.PATTERN101:
-            return i * j % 2 + i * j % 3 === 0;
-          case exports.Patterns.PATTERN110:
-            return (i * j % 2 + i * j % 3) % 2 === 0;
-          case exports.Patterns.PATTERN111:
-            return (i * j % 3 + (i + j) % 2) % 2 === 0;
-          default:
-            throw new Error("bad maskPattern:" + maskPattern);
-        }
-      }
-      exports.applyMask = function(pattern, data) {
-        let size = data.size;
-        for (let col = 0; col < size; col++)
-          for (let row = 0; row < size; row++)
-            data.isReserved(row, col) || data.xor(row, col, getMaskAt(pattern, row, col));
-      };
-      exports.getBestMask = function(data, setupFormatFunc) {
-        let numPatterns = Object.keys(exports.Patterns).length, bestPattern = 0, lowerPenalty = 1 / 0;
-        for (let p = 0; p < numPatterns; p++) {
-          setupFormatFunc(p), exports.applyMask(p, data);
-          let penalty = exports.getPenaltyN1(data) + exports.getPenaltyN2(data) + exports.getPenaltyN3(data) + exports.getPenaltyN4(data);
-          exports.applyMask(p, data), penalty < lowerPenalty && (lowerPenalty = penalty, bestPattern = p);
-        }
-        return bestPattern;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/error-correction-code.js
-  var require_error_correction_code = __commonJS({
-    "node_modules/qrcode/lib/core/error-correction-code.js"(exports) {
-      var ECLevel = require_error_correction_level(), EC_BLOCKS_TABLE = [
-        // L  M  Q  H
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        2,
-        2,
-        1,
-        2,
-        2,
-        4,
-        1,
-        2,
-        4,
-        4,
-        2,
-        4,
-        4,
-        4,
-        2,
-        4,
-        6,
-        5,
-        2,
-        4,
-        6,
-        6,
-        2,
-        5,
-        8,
-        8,
-        4,
-        5,
-        8,
-        8,
-        4,
-        5,
-        8,
-        11,
-        4,
-        8,
-        10,
-        11,
-        4,
-        9,
-        12,
-        16,
-        4,
-        9,
-        16,
-        16,
-        6,
-        10,
-        12,
-        18,
-        6,
-        10,
-        17,
-        16,
-        6,
-        11,
-        16,
-        19,
-        6,
-        13,
-        18,
-        21,
-        7,
-        14,
-        21,
-        25,
-        8,
-        16,
-        20,
-        25,
-        8,
-        17,
-        23,
-        25,
-        9,
-        17,
-        23,
-        34,
-        9,
-        18,
-        25,
-        30,
-        10,
-        20,
-        27,
-        32,
-        12,
-        21,
-        29,
-        35,
-        12,
-        23,
-        34,
-        37,
-        12,
-        25,
-        34,
-        40,
-        13,
-        26,
-        35,
-        42,
-        14,
-        28,
-        38,
-        45,
-        15,
-        29,
-        40,
-        48,
-        16,
-        31,
-        43,
-        51,
-        17,
-        33,
-        45,
-        54,
-        18,
-        35,
-        48,
-        57,
-        19,
-        37,
-        51,
-        60,
-        19,
-        38,
-        53,
-        63,
-        20,
-        40,
-        56,
-        66,
-        21,
-        43,
-        59,
-        70,
-        22,
-        45,
-        62,
-        74,
-        24,
-        47,
-        65,
-        77,
-        25,
-        49,
-        68,
-        81
-      ], EC_CODEWORDS_TABLE = [
-        // L  M  Q  H
-        7,
-        10,
-        13,
-        17,
-        10,
-        16,
-        22,
-        28,
-        15,
-        26,
-        36,
-        44,
-        20,
-        36,
-        52,
-        64,
-        26,
-        48,
-        72,
-        88,
-        36,
-        64,
-        96,
-        112,
-        40,
-        72,
-        108,
-        130,
-        48,
-        88,
-        132,
-        156,
-        60,
-        110,
-        160,
-        192,
-        72,
-        130,
-        192,
-        224,
-        80,
-        150,
-        224,
-        264,
-        96,
-        176,
-        260,
-        308,
-        104,
-        198,
-        288,
-        352,
-        120,
-        216,
-        320,
-        384,
-        132,
-        240,
-        360,
-        432,
-        144,
-        280,
-        408,
-        480,
-        168,
-        308,
-        448,
-        532,
-        180,
-        338,
-        504,
-        588,
-        196,
-        364,
-        546,
-        650,
-        224,
-        416,
-        600,
-        700,
-        224,
-        442,
-        644,
-        750,
-        252,
-        476,
-        690,
-        816,
-        270,
-        504,
-        750,
-        900,
-        300,
-        560,
-        810,
-        960,
-        312,
-        588,
-        870,
-        1050,
-        336,
-        644,
-        952,
-        1110,
-        360,
-        700,
-        1020,
-        1200,
-        390,
-        728,
-        1050,
-        1260,
-        420,
-        784,
-        1140,
-        1350,
-        450,
-        812,
-        1200,
-        1440,
-        480,
-        868,
-        1290,
-        1530,
-        510,
-        924,
-        1350,
-        1620,
-        540,
-        980,
-        1440,
-        1710,
-        570,
-        1036,
-        1530,
-        1800,
-        570,
-        1064,
-        1590,
-        1890,
-        600,
-        1120,
-        1680,
-        1980,
-        630,
-        1204,
-        1770,
-        2100,
-        660,
-        1260,
-        1860,
-        2220,
-        720,
-        1316,
-        1950,
-        2310,
-        750,
-        1372,
-        2040,
-        2430
-      ];
-      exports.getBlocksCount = function(version, errorCorrectionLevel) {
-        switch (errorCorrectionLevel) {
-          case ECLevel.L:
-            return EC_BLOCKS_TABLE[(version - 1) * 4 + 0];
-          case ECLevel.M:
-            return EC_BLOCKS_TABLE[(version - 1) * 4 + 1];
-          case ECLevel.Q:
-            return EC_BLOCKS_TABLE[(version - 1) * 4 + 2];
-          case ECLevel.H:
-            return EC_BLOCKS_TABLE[(version - 1) * 4 + 3];
-          default:
-            return;
-        }
-      };
-      exports.getTotalCodewordsCount = function(version, errorCorrectionLevel) {
-        switch (errorCorrectionLevel) {
-          case ECLevel.L:
-            return EC_CODEWORDS_TABLE[(version - 1) * 4 + 0];
-          case ECLevel.M:
-            return EC_CODEWORDS_TABLE[(version - 1) * 4 + 1];
-          case ECLevel.Q:
-            return EC_CODEWORDS_TABLE[(version - 1) * 4 + 2];
-          case ECLevel.H:
-            return EC_CODEWORDS_TABLE[(version - 1) * 4 + 3];
-          default:
-            return;
-        }
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/galois-field.js
-  var require_galois_field = __commonJS({
-    "node_modules/qrcode/lib/core/galois-field.js"(exports) {
-      var EXP_TABLE = new Uint8Array(512), LOG_TABLE = new Uint8Array(256);
-      (function() {
-        let x = 1;
-        for (let i = 0; i < 255; i++)
-          EXP_TABLE[i] = x, LOG_TABLE[x] = i, x <<= 1, x & 256 && (x ^= 285);
-        for (let i = 255; i < 512; i++)
-          EXP_TABLE[i] = EXP_TABLE[i - 255];
-      })();
-      exports.log = function(n) {
-        if (n < 1) throw new Error("log(" + n + ")");
-        return LOG_TABLE[n];
-      };
-      exports.exp = function(n) {
-        return EXP_TABLE[n];
-      };
-      exports.mul = function(x, y) {
-        return x === 0 || y === 0 ? 0 : EXP_TABLE[LOG_TABLE[x] + LOG_TABLE[y]];
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/polynomial.js
-  var require_polynomial = __commonJS({
-    "node_modules/qrcode/lib/core/polynomial.js"(exports) {
-      var GF = require_galois_field();
-      exports.mul = function(p1, p2) {
-        let coeff = new Uint8Array(p1.length + p2.length - 1);
-        for (let i = 0; i < p1.length; i++)
-          for (let j = 0; j < p2.length; j++)
-            coeff[i + j] ^= GF.mul(p1[i], p2[j]);
-        return coeff;
-      };
-      exports.mod = function(divident, divisor) {
-        let result = new Uint8Array(divident);
-        for (; result.length - divisor.length >= 0; ) {
-          let coeff = result[0];
-          for (let i = 0; i < divisor.length; i++)
-            result[i] ^= GF.mul(divisor[i], coeff);
-          let offset = 0;
-          for (; offset < result.length && result[offset] === 0; ) offset++;
-          result = result.slice(offset);
-        }
-        return result;
-      };
-      exports.generateECPolynomial = function(degree) {
-        let poly = new Uint8Array([1]);
-        for (let i = 0; i < degree; i++)
-          poly = exports.mul(poly, new Uint8Array([1, GF.exp(i)]));
-        return poly;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/reed-solomon-encoder.js
-  var require_reed_solomon_encoder = __commonJS({
-    "node_modules/qrcode/lib/core/reed-solomon-encoder.js"(exports, module) {
-      var Polynomial = require_polynomial();
-      function ReedSolomonEncoder(degree) {
-        this.genPoly = void 0, this.degree = degree, this.degree && this.initialize(this.degree);
-      }
-      ReedSolomonEncoder.prototype.initialize = function(degree) {
-        this.degree = degree, this.genPoly = Polynomial.generateECPolynomial(this.degree);
-      };
-      ReedSolomonEncoder.prototype.encode = function(data) {
-        if (!this.genPoly)
-          throw new Error("Encoder not initialized");
-        let paddedData = new Uint8Array(data.length + this.degree);
-        paddedData.set(data);
-        let remainder = Polynomial.mod(paddedData, this.genPoly), start = this.degree - remainder.length;
-        if (start > 0) {
-          let buff = new Uint8Array(this.degree);
-          return buff.set(remainder, start), buff;
-        }
-        return remainder;
-      };
-      module.exports = ReedSolomonEncoder;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/version-check.js
-  var require_version_check = __commonJS({
-    "node_modules/qrcode/lib/core/version-check.js"(exports) {
-      exports.isValid = function(version) {
-        return !isNaN(version) && version >= 1 && version <= 40;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/regex.js
-  var require_regex = __commonJS({
-    "node_modules/qrcode/lib/core/regex.js"(exports) {
-      var numeric = "[0-9]+", alphanumeric = "[A-Z $%*+\\-./:]+", kanji = "(?:[u3000-u303F]|[u3040-u309F]|[u30A0-u30FF]|[uFF00-uFFEF]|[u4E00-u9FAF]|[u2605-u2606]|[u2190-u2195]|u203B|[u2010u2015u2018u2019u2025u2026u201Cu201Du2225u2260]|[u0391-u0451]|[u00A7u00A8u00B1u00B4u00D7u00F7])+";
-      kanji = kanji.replace(/u/g, "\\u");
-      var byte = "(?:(?![A-Z0-9 $%*+\\-./:]|" + kanji + `)(?:.|[\r
-]))+`;
-      exports.KANJI = new RegExp(kanji, "g");
-      exports.BYTE_KANJI = new RegExp("[^A-Z0-9 $%*+\\-./:]+", "g");
-      exports.BYTE = new RegExp(byte, "g");
-      exports.NUMERIC = new RegExp(numeric, "g");
-      exports.ALPHANUMERIC = new RegExp(alphanumeric, "g");
-      var TEST_KANJI = new RegExp("^" + kanji + "$"), TEST_NUMERIC = new RegExp("^" + numeric + "$"), TEST_ALPHANUMERIC = new RegExp("^[A-Z0-9 $%*+\\-./:]+$");
-      exports.testKanji = function(str) {
-        return TEST_KANJI.test(str);
-      };
-      exports.testNumeric = function(str) {
-        return TEST_NUMERIC.test(str);
-      };
-      exports.testAlphanumeric = function(str) {
-        return TEST_ALPHANUMERIC.test(str);
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/mode.js
-  var require_mode = __commonJS({
-    "node_modules/qrcode/lib/core/mode.js"(exports) {
-      var VersionCheck = require_version_check(), Regex = require_regex();
-      exports.NUMERIC = {
-        id: "Numeric",
-        bit: 1,
-        ccBits: [10, 12, 14]
-      };
-      exports.ALPHANUMERIC = {
-        id: "Alphanumeric",
-        bit: 2,
-        ccBits: [9, 11, 13]
-      };
-      exports.BYTE = {
-        id: "Byte",
-        bit: 4,
-        ccBits: [8, 16, 16]
-      };
-      exports.KANJI = {
-        id: "Kanji",
-        bit: 8,
-        ccBits: [8, 10, 12]
-      };
-      exports.MIXED = {
-        bit: -1
-      };
-      exports.getCharCountIndicator = function(mode, version) {
-        if (!mode.ccBits) throw new Error("Invalid mode: " + mode);
-        if (!VersionCheck.isValid(version))
-          throw new Error("Invalid version: " + version);
-        return version >= 1 && version < 10 ? mode.ccBits[0] : version < 27 ? mode.ccBits[1] : mode.ccBits[2];
-      };
-      exports.getBestModeForData = function(dataStr) {
-        return Regex.testNumeric(dataStr) ? exports.NUMERIC : Regex.testAlphanumeric(dataStr) ? exports.ALPHANUMERIC : Regex.testKanji(dataStr) ? exports.KANJI : exports.BYTE;
-      };
-      exports.toString = function(mode) {
-        if (mode && mode.id) return mode.id;
-        throw new Error("Invalid mode");
-      };
-      exports.isValid = function(mode) {
-        return mode && mode.bit && mode.ccBits;
-      };
-      function fromString(string) {
-        if (typeof string != "string")
-          throw new Error("Param is not a string");
-        switch (string.toLowerCase()) {
-          case "numeric":
-            return exports.NUMERIC;
-          case "alphanumeric":
-            return exports.ALPHANUMERIC;
-          case "kanji":
-            return exports.KANJI;
-          case "byte":
-            return exports.BYTE;
-          default:
-            throw new Error("Unknown mode: " + string);
-        }
-      }
-      exports.from = function(value, defaultValue) {
-        if (exports.isValid(value))
-          return value;
-        try {
-          return fromString(value);
-        } catch {
-          return defaultValue;
-        }
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/version.js
-  var require_version = __commonJS({
-    "node_modules/qrcode/lib/core/version.js"(exports) {
-      var Utils = require_utils(), ECCode = require_error_correction_code(), ECLevel = require_error_correction_level(), Mode = require_mode(), VersionCheck = require_version_check(), G18 = 7973, G18_BCH = Utils.getBCHDigit(G18);
-      function getBestVersionForDataLength(mode, length, errorCorrectionLevel) {
-        for (let currentVersion = 1; currentVersion <= 40; currentVersion++)
-          if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, mode))
-            return currentVersion;
-      }
-      function getReservedBitsCount(mode, version) {
-        return Mode.getCharCountIndicator(mode, version) + 4;
-      }
-      function getTotalBitsFromDataArray(segments, version) {
-        let totalBits = 0;
-        return segments.forEach(function(data) {
-          let reservedBits = getReservedBitsCount(data.mode, version);
-          totalBits += reservedBits + data.getBitsLength();
-        }), totalBits;
-      }
-      function getBestVersionForMixedData(segments, errorCorrectionLevel) {
-        for (let currentVersion = 1; currentVersion <= 40; currentVersion++)
-          if (getTotalBitsFromDataArray(segments, currentVersion) <= exports.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED))
-            return currentVersion;
-      }
-      exports.from = function(value, defaultValue) {
-        return VersionCheck.isValid(value) ? parseInt(value, 10) : defaultValue;
-      };
-      exports.getCapacity = function(version, errorCorrectionLevel, mode) {
-        if (!VersionCheck.isValid(version))
-          throw new Error("Invalid QR Code version");
-        typeof mode > "u" && (mode = Mode.BYTE);
-        let totalCodewords = Utils.getSymbolTotalCodewords(version), ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel), dataTotalCodewordsBits = (totalCodewords - ecTotalCodewords) * 8;
-        if (mode === Mode.MIXED) return dataTotalCodewordsBits;
-        let usableBits = dataTotalCodewordsBits - getReservedBitsCount(mode, version);
-        switch (mode) {
-          case Mode.NUMERIC:
-            return Math.floor(usableBits / 10 * 3);
-          case Mode.ALPHANUMERIC:
-            return Math.floor(usableBits / 11 * 2);
-          case Mode.KANJI:
-            return Math.floor(usableBits / 13);
-          case Mode.BYTE:
-          default:
-            return Math.floor(usableBits / 8);
-        }
-      };
-      exports.getBestVersionForData = function(data, errorCorrectionLevel) {
-        let seg, ecl = ECLevel.from(errorCorrectionLevel, ECLevel.M);
-        if (Array.isArray(data)) {
-          if (data.length > 1)
-            return getBestVersionForMixedData(data, ecl);
-          if (data.length === 0)
-            return 1;
-          seg = data[0];
-        } else
-          seg = data;
-        return getBestVersionForDataLength(seg.mode, seg.getLength(), ecl);
-      };
-      exports.getEncodedBits = function(version) {
-        if (!VersionCheck.isValid(version) || version < 7)
-          throw new Error("Invalid QR Code version");
-        let d = version << 12;
-        for (; Utils.getBCHDigit(d) - G18_BCH >= 0; )
-          d ^= G18 << Utils.getBCHDigit(d) - G18_BCH;
-        return version << 12 | d;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/format-info.js
-  var require_format_info = __commonJS({
-    "node_modules/qrcode/lib/core/format-info.js"(exports) {
-      var Utils = require_utils(), G15 = 1335, G15_MASK = 21522, G15_BCH = Utils.getBCHDigit(G15);
-      exports.getEncodedBits = function(errorCorrectionLevel, mask) {
-        let data = errorCorrectionLevel.bit << 3 | mask, d = data << 10;
-        for (; Utils.getBCHDigit(d) - G15_BCH >= 0; )
-          d ^= G15 << Utils.getBCHDigit(d) - G15_BCH;
-        return (data << 10 | d) ^ G15_MASK;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/numeric-data.js
-  var require_numeric_data = __commonJS({
-    "node_modules/qrcode/lib/core/numeric-data.js"(exports, module) {
-      var Mode = require_mode();
-      function NumericData(data) {
-        this.mode = Mode.NUMERIC, this.data = data.toString();
-      }
-      NumericData.getBitsLength = function(length) {
-        return 10 * Math.floor(length / 3) + (length % 3 ? length % 3 * 3 + 1 : 0);
-      };
-      NumericData.prototype.getLength = function() {
-        return this.data.length;
-      };
-      NumericData.prototype.getBitsLength = function() {
-        return NumericData.getBitsLength(this.data.length);
-      };
-      NumericData.prototype.write = function(bitBuffer) {
-        let i, group, value;
-        for (i = 0; i + 3 <= this.data.length; i += 3)
-          group = this.data.substr(i, 3), value = parseInt(group, 10), bitBuffer.put(value, 10);
-        let remainingNum = this.data.length - i;
-        remainingNum > 0 && (group = this.data.substr(i), value = parseInt(group, 10), bitBuffer.put(value, remainingNum * 3 + 1));
-      };
-      module.exports = NumericData;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/alphanumeric-data.js
-  var require_alphanumeric_data = __commonJS({
-    "node_modules/qrcode/lib/core/alphanumeric-data.js"(exports, module) {
-      var Mode = require_mode(), ALPHA_NUM_CHARS = [
-        "0",
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "A",
-        "B",
-        "C",
-        "D",
-        "E",
-        "F",
-        "G",
-        "H",
-        "I",
-        "J",
-        "K",
-        "L",
-        "M",
-        "N",
-        "O",
-        "P",
-        "Q",
-        "R",
-        "S",
-        "T",
-        "U",
-        "V",
-        "W",
-        "X",
-        "Y",
-        "Z",
-        " ",
-        "$",
-        "%",
-        "*",
-        "+",
-        "-",
-        ".",
-        "/",
-        ":"
-      ];
-      function AlphanumericData(data) {
-        this.mode = Mode.ALPHANUMERIC, this.data = data;
-      }
-      AlphanumericData.getBitsLength = function(length) {
-        return 11 * Math.floor(length / 2) + 6 * (length % 2);
-      };
-      AlphanumericData.prototype.getLength = function() {
-        return this.data.length;
-      };
-      AlphanumericData.prototype.getBitsLength = function() {
-        return AlphanumericData.getBitsLength(this.data.length);
-      };
-      AlphanumericData.prototype.write = function(bitBuffer) {
-        let i;
-        for (i = 0; i + 2 <= this.data.length; i += 2) {
-          let value = ALPHA_NUM_CHARS.indexOf(this.data[i]) * 45;
-          value += ALPHA_NUM_CHARS.indexOf(this.data[i + 1]), bitBuffer.put(value, 11);
-        }
-        this.data.length % 2 && bitBuffer.put(ALPHA_NUM_CHARS.indexOf(this.data[i]), 6);
-      };
-      module.exports = AlphanumericData;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/byte-data.js
-  var require_byte_data = __commonJS({
-    "node_modules/qrcode/lib/core/byte-data.js"(exports, module) {
-      var Mode = require_mode();
-      function ByteData(data) {
-        this.mode = Mode.BYTE, typeof data == "string" ? this.data = new TextEncoder().encode(data) : this.data = new Uint8Array(data);
-      }
-      ByteData.getBitsLength = function(length) {
-        return length * 8;
-      };
-      ByteData.prototype.getLength = function() {
-        return this.data.length;
-      };
-      ByteData.prototype.getBitsLength = function() {
-        return ByteData.getBitsLength(this.data.length);
-      };
-      ByteData.prototype.write = function(bitBuffer) {
-        for (let i = 0, l = this.data.length; i < l; i++)
-          bitBuffer.put(this.data[i], 8);
-      };
-      module.exports = ByteData;
-    }
-  });
-
-  // node_modules/qrcode/lib/core/kanji-data.js
-  var require_kanji_data = __commonJS({
-    "node_modules/qrcode/lib/core/kanji-data.js"(exports, module) {
-      var Mode = require_mode(), Utils = require_utils();
-      function KanjiData(data) {
-        this.mode = Mode.KANJI, this.data = data;
-      }
-      KanjiData.getBitsLength = function(length) {
-        return length * 13;
-      };
-      KanjiData.prototype.getLength = function() {
-        return this.data.length;
-      };
-      KanjiData.prototype.getBitsLength = function() {
-        return KanjiData.getBitsLength(this.data.length);
-      };
-      KanjiData.prototype.write = function(bitBuffer) {
-        let i;
-        for (i = 0; i < this.data.length; i++) {
-          let value = Utils.toSJIS(this.data[i]);
-          if (value >= 33088 && value <= 40956)
-            value -= 33088;
-          else if (value >= 57408 && value <= 60351)
-            value -= 49472;
-          else
-            throw new Error(
-              "Invalid SJIS character: " + this.data[i] + `
-Make sure your charset is UTF-8`
-            );
-          value = (value >>> 8 & 255) * 192 + (value & 255), bitBuffer.put(value, 13);
-        }
-      };
-      module.exports = KanjiData;
-    }
-  });
-
-  // node_modules/dijkstrajs/dijkstra.js
-  var require_dijkstra = __commonJS({
-    "node_modules/dijkstrajs/dijkstra.js"(exports, module) {
-      "use strict";
-      var dijkstra = {
-        single_source_shortest_paths: function(graph, s, d) {
-          var predecessors = {}, costs = {};
-          costs[s] = 0;
-          var open = dijkstra.PriorityQueue.make();
-          open.push(s, 0);
-          for (var closest, u, v, cost_of_s_to_u, adjacent_nodes, cost_of_e, cost_of_s_to_u_plus_cost_of_e, cost_of_s_to_v, first_visit; !open.empty(); ) {
-            closest = open.pop(), u = closest.value, cost_of_s_to_u = closest.cost, adjacent_nodes = graph[u] || {};
-            for (v in adjacent_nodes)
-              adjacent_nodes.hasOwnProperty(v) && (cost_of_e = adjacent_nodes[v], cost_of_s_to_u_plus_cost_of_e = cost_of_s_to_u + cost_of_e, cost_of_s_to_v = costs[v], first_visit = typeof costs[v] > "u", (first_visit || cost_of_s_to_v > cost_of_s_to_u_plus_cost_of_e) && (costs[v] = cost_of_s_to_u_plus_cost_of_e, open.push(v, cost_of_s_to_u_plus_cost_of_e), predecessors[v] = u));
-          }
-          if (typeof d < "u" && typeof costs[d] > "u") {
-            var msg = ["Could not find a path from ", s, " to ", d, "."].join("");
-            throw new Error(msg);
-          }
-          return predecessors;
-        },
-        extract_shortest_path_from_predecessor_list: function(predecessors, d) {
-          for (var nodes = [], u = d, predecessor; u; )
-            nodes.push(u), predecessor = predecessors[u], u = predecessors[u];
-          return nodes.reverse(), nodes;
-        },
-        find_path: function(graph, s, d) {
-          var predecessors = dijkstra.single_source_shortest_paths(graph, s, d);
-          return dijkstra.extract_shortest_path_from_predecessor_list(
-            predecessors,
-            d
-          );
-        },
-        /**
-         * A very naive priority queue implementation.
-         */
-        PriorityQueue: {
-          make: function(opts) {
-            var T = dijkstra.PriorityQueue, t = {}, key;
-            opts = opts || {};
-            for (key in T)
-              T.hasOwnProperty(key) && (t[key] = T[key]);
-            return t.queue = [], t.sorter = opts.sorter || T.default_sorter, t;
-          },
-          default_sorter: function(a, b) {
-            return a.cost - b.cost;
-          },
-          /**
-           * Add a new item to the queue and ensure the highest priority element
-           * is at the front of the queue.
-           */
-          push: function(value, cost) {
-            var item = { value, cost };
-            this.queue.push(item), this.queue.sort(this.sorter);
-          },
-          /**
-           * Return the highest priority element in the queue.
-           */
-          pop: function() {
-            return this.queue.shift();
-          },
-          empty: function() {
-            return this.queue.length === 0;
-          }
-        }
-      };
-      typeof module < "u" && (module.exports = dijkstra);
-    }
-  });
-
-  // node_modules/qrcode/lib/core/segments.js
-  var require_segments = __commonJS({
-    "node_modules/qrcode/lib/core/segments.js"(exports) {
-      var Mode = require_mode(), NumericData = require_numeric_data(), AlphanumericData = require_alphanumeric_data(), ByteData = require_byte_data(), KanjiData = require_kanji_data(), Regex = require_regex(), Utils = require_utils(), dijkstra = require_dijkstra();
-      function getStringByteLength(str) {
-        return unescape(encodeURIComponent(str)).length;
-      }
-      function getSegments(regex, mode, str) {
-        let segments = [], result;
-        for (; (result = regex.exec(str)) !== null; )
-          segments.push({
-            data: result[0],
-            index: result.index,
-            mode,
-            length: result[0].length
-          });
-        return segments;
-      }
-      function getSegmentsFromString(dataStr) {
-        let numSegs = getSegments(Regex.NUMERIC, Mode.NUMERIC, dataStr), alphaNumSegs = getSegments(Regex.ALPHANUMERIC, Mode.ALPHANUMERIC, dataStr), byteSegs, kanjiSegs;
-        return Utils.isKanjiModeEnabled() ? (byteSegs = getSegments(Regex.BYTE, Mode.BYTE, dataStr), kanjiSegs = getSegments(Regex.KANJI, Mode.KANJI, dataStr)) : (byteSegs = getSegments(Regex.BYTE_KANJI, Mode.BYTE, dataStr), kanjiSegs = []), numSegs.concat(alphaNumSegs, byteSegs, kanjiSegs).sort(function(s1, s2) {
-          return s1.index - s2.index;
-        }).map(function(obj) {
-          return {
-            data: obj.data,
-            mode: obj.mode,
-            length: obj.length
-          };
-        });
-      }
-      function getSegmentBitsLength(length, mode) {
-        switch (mode) {
-          case Mode.NUMERIC:
-            return NumericData.getBitsLength(length);
-          case Mode.ALPHANUMERIC:
-            return AlphanumericData.getBitsLength(length);
-          case Mode.KANJI:
-            return KanjiData.getBitsLength(length);
-          case Mode.BYTE:
-            return ByteData.getBitsLength(length);
-        }
-      }
-      function mergeSegments(segs) {
-        return segs.reduce(function(acc, curr) {
-          let prevSeg = acc.length - 1 >= 0 ? acc[acc.length - 1] : null;
-          return prevSeg && prevSeg.mode === curr.mode ? (acc[acc.length - 1].data += curr.data, acc) : (acc.push(curr), acc);
-        }, []);
-      }
-      function buildNodes(segs) {
-        let nodes = [];
-        for (let i = 0; i < segs.length; i++) {
-          let seg = segs[i];
-          switch (seg.mode) {
-            case Mode.NUMERIC:
-              nodes.push([
-                seg,
-                { data: seg.data, mode: Mode.ALPHANUMERIC, length: seg.length },
-                { data: seg.data, mode: Mode.BYTE, length: seg.length }
-              ]);
-              break;
-            case Mode.ALPHANUMERIC:
-              nodes.push([
-                seg,
-                { data: seg.data, mode: Mode.BYTE, length: seg.length }
-              ]);
-              break;
-            case Mode.KANJI:
-              nodes.push([
-                seg,
-                { data: seg.data, mode: Mode.BYTE, length: getStringByteLength(seg.data) }
-              ]);
-              break;
-            case Mode.BYTE:
-              nodes.push([
-                { data: seg.data, mode: Mode.BYTE, length: getStringByteLength(seg.data) }
-              ]);
-          }
-        }
-        return nodes;
-      }
-      function buildGraph(nodes, version) {
-        let table = {}, graph = { start: {} }, prevNodeIds = ["start"];
-        for (let i = 0; i < nodes.length; i++) {
-          let nodeGroup = nodes[i], currentNodeIds = [];
-          for (let j = 0; j < nodeGroup.length; j++) {
-            let node = nodeGroup[j], key = "" + i + j;
-            currentNodeIds.push(key), table[key] = { node, lastCount: 0 }, graph[key] = {};
-            for (let n = 0; n < prevNodeIds.length; n++) {
-              let prevNodeId = prevNodeIds[n];
-              table[prevNodeId] && table[prevNodeId].node.mode === node.mode ? (graph[prevNodeId][key] = getSegmentBitsLength(table[prevNodeId].lastCount + node.length, node.mode) - getSegmentBitsLength(table[prevNodeId].lastCount, node.mode), table[prevNodeId].lastCount += node.length) : (table[prevNodeId] && (table[prevNodeId].lastCount = node.length), graph[prevNodeId][key] = getSegmentBitsLength(node.length, node.mode) + 4 + Mode.getCharCountIndicator(node.mode, version));
-            }
-          }
-          prevNodeIds = currentNodeIds;
-        }
-        for (let n = 0; n < prevNodeIds.length; n++)
-          graph[prevNodeIds[n]].end = 0;
-        return { map: graph, table };
-      }
-      function buildSingleSegment(data, modesHint) {
-        let mode, bestMode = Mode.getBestModeForData(data);
-        if (mode = Mode.from(modesHint, bestMode), mode !== Mode.BYTE && mode.bit < bestMode.bit)
-          throw new Error('"' + data + '" cannot be encoded with mode ' + Mode.toString(mode) + `.
- Suggested mode is: ` + Mode.toString(bestMode));
-        switch (mode === Mode.KANJI && !Utils.isKanjiModeEnabled() && (mode = Mode.BYTE), mode) {
-          case Mode.NUMERIC:
-            return new NumericData(data);
-          case Mode.ALPHANUMERIC:
-            return new AlphanumericData(data);
-          case Mode.KANJI:
-            return new KanjiData(data);
-          case Mode.BYTE:
-            return new ByteData(data);
-        }
-      }
-      exports.fromArray = function(array) {
-        return array.reduce(function(acc, seg) {
-          return typeof seg == "string" ? acc.push(buildSingleSegment(seg, null)) : seg.data && acc.push(buildSingleSegment(seg.data, seg.mode)), acc;
-        }, []);
-      };
-      exports.fromString = function(data, version) {
-        let segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled()), nodes = buildNodes(segs), graph = buildGraph(nodes, version), path = dijkstra.find_path(graph.map, "start", "end"), optimizedSegs = [];
-        for (let i = 1; i < path.length - 1; i++)
-          optimizedSegs.push(graph.table[path[i]].node);
-        return exports.fromArray(mergeSegments(optimizedSegs));
-      };
-      exports.rawSplit = function(data) {
-        return exports.fromArray(
-          getSegmentsFromString(data, Utils.isKanjiModeEnabled())
-        );
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/core/qrcode.js
-  var require_qrcode = __commonJS({
-    "node_modules/qrcode/lib/core/qrcode.js"(exports) {
-      var Utils = require_utils(), ECLevel = require_error_correction_level(), BitBuffer = require_bit_buffer(), BitMatrix = require_bit_matrix(), AlignmentPattern = require_alignment_pattern(), FinderPattern = require_finder_pattern(), MaskPattern = require_mask_pattern(), ECCode = require_error_correction_code(), ReedSolomonEncoder = require_reed_solomon_encoder(), Version = require_version(), FormatInfo = require_format_info(), Mode = require_mode(), Segments = require_segments();
-      function setupFinderPattern(matrix, version) {
-        let size = matrix.size, pos = FinderPattern.getPositions(version);
-        for (let i = 0; i < pos.length; i++) {
-          let row = pos[i][0], col = pos[i][1];
-          for (let r = -1; r <= 7; r++)
-            if (!(row + r <= -1 || size <= row + r))
-              for (let c = -1; c <= 7; c++)
-                col + c <= -1 || size <= col + c || (r >= 0 && r <= 6 && (c === 0 || c === 6) || c >= 0 && c <= 6 && (r === 0 || r === 6) || r >= 2 && r <= 4 && c >= 2 && c <= 4 ? matrix.set(row + r, col + c, !0, !0) : matrix.set(row + r, col + c, !1, !0));
-        }
-      }
-      function setupTimingPattern(matrix) {
-        let size = matrix.size;
-        for (let r = 8; r < size - 8; r++) {
-          let value = r % 2 === 0;
-          matrix.set(r, 6, value, !0), matrix.set(6, r, value, !0);
-        }
-      }
-      function setupAlignmentPattern(matrix, version) {
-        let pos = AlignmentPattern.getPositions(version);
-        for (let i = 0; i < pos.length; i++) {
-          let row = pos[i][0], col = pos[i][1];
-          for (let r = -2; r <= 2; r++)
-            for (let c = -2; c <= 2; c++)
-              r === -2 || r === 2 || c === -2 || c === 2 || r === 0 && c === 0 ? matrix.set(row + r, col + c, !0, !0) : matrix.set(row + r, col + c, !1, !0);
-        }
-      }
-      function setupVersionInfo(matrix, version) {
-        let size = matrix.size, bits = Version.getEncodedBits(version), row, col, mod;
-        for (let i = 0; i < 18; i++)
-          row = Math.floor(i / 3), col = i % 3 + size - 8 - 3, mod = (bits >> i & 1) === 1, matrix.set(row, col, mod, !0), matrix.set(col, row, mod, !0);
-      }
-      function setupFormatInfo(matrix, errorCorrectionLevel, maskPattern) {
-        let size = matrix.size, bits = FormatInfo.getEncodedBits(errorCorrectionLevel, maskPattern), i, mod;
-        for (i = 0; i < 15; i++)
-          mod = (bits >> i & 1) === 1, i < 6 ? matrix.set(i, 8, mod, !0) : i < 8 ? matrix.set(i + 1, 8, mod, !0) : matrix.set(size - 15 + i, 8, mod, !0), i < 8 ? matrix.set(8, size - i - 1, mod, !0) : i < 9 ? matrix.set(8, 15 - i - 1 + 1, mod, !0) : matrix.set(8, 15 - i - 1, mod, !0);
-        matrix.set(size - 8, 8, 1, !0);
-      }
-      function setupData(matrix, data) {
-        let size = matrix.size, inc = -1, row = size - 1, bitIndex = 7, byteIndex = 0;
-        for (let col = size - 1; col > 0; col -= 2)
-          for (col === 6 && col--; ; ) {
-            for (let c = 0; c < 2; c++)
-              if (!matrix.isReserved(row, col - c)) {
-                let dark = !1;
-                byteIndex < data.length && (dark = (data[byteIndex] >>> bitIndex & 1) === 1), matrix.set(row, col - c, dark), bitIndex--, bitIndex === -1 && (byteIndex++, bitIndex = 7);
-              }
-            if (row += inc, row < 0 || size <= row) {
-              row -= inc, inc = -inc;
-              break;
-            }
-          }
-      }
-      function createData(version, errorCorrectionLevel, segments) {
-        let buffer = new BitBuffer();
-        segments.forEach(function(data) {
-          buffer.put(data.mode.bit, 4), buffer.put(data.getLength(), Mode.getCharCountIndicator(data.mode, version)), data.write(buffer);
-        });
-        let totalCodewords = Utils.getSymbolTotalCodewords(version), ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel), dataTotalCodewordsBits = (totalCodewords - ecTotalCodewords) * 8;
-        for (buffer.getLengthInBits() + 4 <= dataTotalCodewordsBits && buffer.put(0, 4); buffer.getLengthInBits() % 8 !== 0; )
-          buffer.putBit(0);
-        let remainingByte = (dataTotalCodewordsBits - buffer.getLengthInBits()) / 8;
-        for (let i = 0; i < remainingByte; i++)
-          buffer.put(i % 2 ? 17 : 236, 8);
-        return createCodewords(buffer, version, errorCorrectionLevel);
-      }
-      function createCodewords(bitBuffer, version, errorCorrectionLevel) {
-        let totalCodewords = Utils.getSymbolTotalCodewords(version), ecTotalCodewords = ECCode.getTotalCodewordsCount(version, errorCorrectionLevel), dataTotalCodewords = totalCodewords - ecTotalCodewords, ecTotalBlocks = ECCode.getBlocksCount(version, errorCorrectionLevel), blocksInGroup2 = totalCodewords % ecTotalBlocks, blocksInGroup1 = ecTotalBlocks - blocksInGroup2, totalCodewordsInGroup1 = Math.floor(totalCodewords / ecTotalBlocks), dataCodewordsInGroup1 = Math.floor(dataTotalCodewords / ecTotalBlocks), dataCodewordsInGroup2 = dataCodewordsInGroup1 + 1, ecCount = totalCodewordsInGroup1 - dataCodewordsInGroup1, rs = new ReedSolomonEncoder(ecCount), offset = 0, dcData = new Array(ecTotalBlocks), ecData = new Array(ecTotalBlocks), maxDataSize = 0, buffer = new Uint8Array(bitBuffer.buffer);
-        for (let b = 0; b < ecTotalBlocks; b++) {
-          let dataSize = b < blocksInGroup1 ? dataCodewordsInGroup1 : dataCodewordsInGroup2;
-          dcData[b] = buffer.slice(offset, offset + dataSize), ecData[b] = rs.encode(dcData[b]), offset += dataSize, maxDataSize = Math.max(maxDataSize, dataSize);
-        }
-        let data = new Uint8Array(totalCodewords), index = 0, i, r;
-        for (i = 0; i < maxDataSize; i++)
-          for (r = 0; r < ecTotalBlocks; r++)
-            i < dcData[r].length && (data[index++] = dcData[r][i]);
-        for (i = 0; i < ecCount; i++)
-          for (r = 0; r < ecTotalBlocks; r++)
-            data[index++] = ecData[r][i];
-        return data;
-      }
-      function createSymbol(data, version, errorCorrectionLevel, maskPattern) {
-        let segments;
-        if (Array.isArray(data))
-          segments = Segments.fromArray(data);
-        else if (typeof data == "string") {
-          let estimatedVersion = version;
-          if (!estimatedVersion) {
-            let rawSegments = Segments.rawSplit(data);
-            estimatedVersion = Version.getBestVersionForData(rawSegments, errorCorrectionLevel);
-          }
-          segments = Segments.fromString(data, estimatedVersion || 40);
-        } else
-          throw new Error("Invalid data");
-        let bestVersion = Version.getBestVersionForData(segments, errorCorrectionLevel);
-        if (!bestVersion)
-          throw new Error("The amount of data is too big to be stored in a QR Code");
-        if (!version)
-          version = bestVersion;
-        else if (version < bestVersion)
-          throw new Error(
-            `
-The chosen QR Code version cannot contain this amount of data.
-Minimum version required to store current data is: ` + bestVersion + `.
-`
-          );
-        let dataBits = createData(version, errorCorrectionLevel, segments), moduleCount = Utils.getSymbolSize(version), modules = new BitMatrix(moduleCount);
-        return setupFinderPattern(modules, version), setupTimingPattern(modules), setupAlignmentPattern(modules, version), setupFormatInfo(modules, errorCorrectionLevel, 0), version >= 7 && setupVersionInfo(modules, version), setupData(modules, dataBits), isNaN(maskPattern) && (maskPattern = MaskPattern.getBestMask(
-          modules,
-          setupFormatInfo.bind(null, modules, errorCorrectionLevel)
-        )), MaskPattern.applyMask(maskPattern, modules), setupFormatInfo(modules, errorCorrectionLevel, maskPattern), {
-          modules,
-          version,
-          errorCorrectionLevel,
-          maskPattern,
-          segments
-        };
-      }
-      exports.create = function(data, options) {
-        if (typeof data > "u" || data === "")
-          throw new Error("No input text");
-        let errorCorrectionLevel = ECLevel.M, version, mask;
-        return typeof options < "u" && (errorCorrectionLevel = ECLevel.from(options.errorCorrectionLevel, ECLevel.M), version = Version.from(options.version), mask = MaskPattern.from(options.maskPattern), options.toSJISFunc && Utils.setToSJISFunction(options.toSJISFunc)), createSymbol(data, version, errorCorrectionLevel, mask);
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/renderer/utils.js
-  var require_utils2 = __commonJS({
-    "node_modules/qrcode/lib/renderer/utils.js"(exports) {
-      function hex2rgba(hex) {
-        if (typeof hex == "number" && (hex = hex.toString()), typeof hex != "string")
-          throw new Error("Color should be defined as hex string");
-        let hexCode = hex.slice().replace("#", "").split("");
-        if (hexCode.length < 3 || hexCode.length === 5 || hexCode.length > 8)
-          throw new Error("Invalid hex color: " + hex);
-        (hexCode.length === 3 || hexCode.length === 4) && (hexCode = Array.prototype.concat.apply([], hexCode.map(function(c) {
-          return [c, c];
-        }))), hexCode.length === 6 && hexCode.push("F", "F");
-        let hexValue = parseInt(hexCode.join(""), 16);
-        return {
-          r: hexValue >> 24 & 255,
-          g: hexValue >> 16 & 255,
-          b: hexValue >> 8 & 255,
-          a: hexValue & 255,
-          hex: "#" + hexCode.slice(0, 6).join("")
-        };
-      }
-      exports.getOptions = function(options) {
-        options || (options = {}), options.color || (options.color = {});
-        let margin = typeof options.margin > "u" || options.margin === null || options.margin < 0 ? 4 : options.margin, width = options.width && options.width >= 21 ? options.width : void 0, scale = options.scale || 4;
-        return {
-          width,
-          scale: width ? 4 : scale,
-          margin,
-          color: {
-            dark: hex2rgba(options.color.dark || "#000000ff"),
-            light: hex2rgba(options.color.light || "#ffffffff")
-          },
-          type: options.type,
-          rendererOpts: options.rendererOpts || {}
-        };
-      };
-      exports.getScale = function(qrSize, opts) {
-        return opts.width && opts.width >= qrSize + opts.margin * 2 ? opts.width / (qrSize + opts.margin * 2) : opts.scale;
-      };
-      exports.getImageWidth = function(qrSize, opts) {
-        let scale = exports.getScale(qrSize, opts);
-        return Math.floor((qrSize + opts.margin * 2) * scale);
-      };
-      exports.qrToImageData = function(imgData, qr, opts) {
-        let size = qr.modules.size, data = qr.modules.data, scale = exports.getScale(size, opts), symbolSize = Math.floor((size + opts.margin * 2) * scale), scaledMargin = opts.margin * scale, palette = [opts.color.light, opts.color.dark];
-        for (let i = 0; i < symbolSize; i++)
-          for (let j = 0; j < symbolSize; j++) {
-            let posDst = (i * symbolSize + j) * 4, pxColor = opts.color.light;
-            if (i >= scaledMargin && j >= scaledMargin && i < symbolSize - scaledMargin && j < symbolSize - scaledMargin) {
-              let iSrc = Math.floor((i - scaledMargin) / scale), jSrc = Math.floor((j - scaledMargin) / scale);
-              pxColor = palette[data[iSrc * size + jSrc] ? 1 : 0];
-            }
-            imgData[posDst++] = pxColor.r, imgData[posDst++] = pxColor.g, imgData[posDst++] = pxColor.b, imgData[posDst] = pxColor.a;
-          }
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/renderer/canvas.js
-  var require_canvas = __commonJS({
-    "node_modules/qrcode/lib/renderer/canvas.js"(exports) {
-      var Utils = require_utils2();
-      function clearCanvas(ctx, canvas, size) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height), canvas.style || (canvas.style = {}), canvas.height = size, canvas.width = size, canvas.style.height = size + "px", canvas.style.width = size + "px";
-      }
-      function getCanvasElement() {
-        try {
-          return document.createElement("canvas");
-        } catch {
-          throw new Error("You need to specify a canvas element");
-        }
-      }
-      exports.render = function(qrData, canvas, options) {
-        let opts = options, canvasEl = canvas;
-        typeof opts > "u" && (!canvas || !canvas.getContext) && (opts = canvas, canvas = void 0), canvas || (canvasEl = getCanvasElement()), opts = Utils.getOptions(opts);
-        let size = Utils.getImageWidth(qrData.modules.size, opts), ctx = canvasEl.getContext("2d"), image = ctx.createImageData(size, size);
-        return Utils.qrToImageData(image.data, qrData, opts), clearCanvas(ctx, canvasEl, size), ctx.putImageData(image, 0, 0), canvasEl;
-      };
-      exports.renderToDataURL = function(qrData, canvas, options) {
-        let opts = options;
-        typeof opts > "u" && (!canvas || !canvas.getContext) && (opts = canvas, canvas = void 0), opts || (opts = {});
-        let canvasEl = exports.render(qrData, canvas, opts), type = opts.type || "image/png", rendererOpts = opts.rendererOpts || {};
-        return canvasEl.toDataURL(type, rendererOpts.quality);
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/renderer/svg-tag.js
-  var require_svg_tag = __commonJS({
-    "node_modules/qrcode/lib/renderer/svg-tag.js"(exports) {
-      var Utils = require_utils2();
-      function getColorAttrib(color, attrib) {
-        let alpha = color.a / 255, str = attrib + '="' + color.hex + '"';
-        return alpha < 1 ? str + " " + attrib + '-opacity="' + alpha.toFixed(2).slice(1) + '"' : str;
-      }
-      function svgCmd(cmd, x, y) {
-        let str = cmd + x;
-        return typeof y < "u" && (str += " " + y), str;
-      }
-      function qrToPath(data, size, margin) {
-        let path = "", moveBy = 0, newRow = !1, lineLength = 0;
-        for (let i = 0; i < data.length; i++) {
-          let col = Math.floor(i % size), row = Math.floor(i / size);
-          !col && !newRow && (newRow = !0), data[i] ? (lineLength++, i > 0 && col > 0 && data[i - 1] || (path += newRow ? svgCmd("M", col + margin, 0.5 + row + margin) : svgCmd("m", moveBy, 0), moveBy = 0, newRow = !1), col + 1 < size && data[i + 1] || (path += svgCmd("h", lineLength), lineLength = 0)) : moveBy++;
-        }
-        return path;
-      }
-      exports.render = function(qrData, options, cb) {
-        let opts = Utils.getOptions(options), size = qrData.modules.size, data = qrData.modules.data, qrcodesize = size + opts.margin * 2, bg = opts.color.light.a ? "<path " + getColorAttrib(opts.color.light, "fill") + ' d="M0 0h' + qrcodesize + "v" + qrcodesize + 'H0z"/>' : "", path = "<path " + getColorAttrib(opts.color.dark, "stroke") + ' d="' + qrToPath(data, size, opts.margin) + '"/>', viewBox = 'viewBox="0 0 ' + qrcodesize + " " + qrcodesize + '"', svgTag = '<svg xmlns="http://www.w3.org/2000/svg" ' + (opts.width ? 'width="' + opts.width + '" height="' + opts.width + '" ' : "") + viewBox + ' shape-rendering="crispEdges">' + bg + path + `</svg>
-`;
-        return typeof cb == "function" && cb(null, svgTag), svgTag;
-      };
-    }
-  });
-
-  // node_modules/qrcode/lib/browser.js
-  var require_browser = __commonJS({
-    "node_modules/qrcode/lib/browser.js"(exports) {
-      var canPromise = require_can_promise(), QRCode2 = require_qrcode(), CanvasRenderer = require_canvas(), SvgRenderer = require_svg_tag();
-      function renderCanvas(renderFunc, canvas, text, opts, cb) {
-        let args = [].slice.call(arguments, 1), argsNum = args.length, isLastArgCb = typeof args[argsNum - 1] == "function";
-        if (!isLastArgCb && !canPromise())
-          throw new Error("Callback required as last argument");
-        if (isLastArgCb) {
-          if (argsNum < 2)
-            throw new Error("Too few arguments provided");
-          argsNum === 2 ? (cb = text, text = canvas, canvas = opts = void 0) : argsNum === 3 && (canvas.getContext && typeof cb > "u" ? (cb = opts, opts = void 0) : (cb = opts, opts = text, text = canvas, canvas = void 0));
-        } else {
-          if (argsNum < 1)
-            throw new Error("Too few arguments provided");
-          return argsNum === 1 ? (text = canvas, canvas = opts = void 0) : argsNum === 2 && !canvas.getContext && (opts = text, text = canvas, canvas = void 0), new Promise(function(resolve, reject) {
-            try {
-              let data = QRCode2.create(text, opts);
-              resolve(renderFunc(data, canvas, opts));
-            } catch (e) {
-              reject(e);
-            }
-          });
-        }
-        try {
-          let data = QRCode2.create(text, opts);
-          cb(null, renderFunc(data, canvas, opts));
-        } catch (e) {
-          cb(e);
-        }
-      }
-      exports.create = QRCode2.create;
-      exports.toCanvas = renderCanvas.bind(null, CanvasRenderer.render);
-      exports.toDataURL = renderCanvas.bind(null, CanvasRenderer.renderToDataURL);
-      exports.toString = renderCanvas.bind(null, function(data, _, opts) {
-        return SvgRenderer.render(data, opts);
-      });
-    }
-  });
-
   // src/client-locale.ts
-  var localeNamespace = "ds-harness-remote", en = {
+  var localeNamespace = "ds-harness-lan", en = {
+    lanTitle: "LAN connections",
+    lanShowToken: "Show access token",
+    lanHideToken: "Hide access token",
+    lanListenerTokenHint: "A custom token requires at least 16 characters, excluding leading and trailing spaces. Leave blank on the first save to generate one; clearing it later keeps the existing token. Show and copy the saved token into the connection settings on your other device.",
+    lanTokenInvalid: "Connection refused. Check the Host access token.",
+    lanManageConnections: "Manage connections",
+    lanDirectHint: "Connect directly by IP address and port. No account or relay is required. Traffic is encrypted with Noise.",
+    lanNoHosts: "No LAN hosts yet. Add an IP address and port in Manage connections.",
+    lanListener: "Listen for LAN connections",
+    lanListenHint: "Only enable on a trusted network. Use an access token to restrict incoming connections.",
+    lanBindAddress: "Local listening address",
+    lanAllIpv4: "All IPv4 interfaces \xB7 0.0.0.0",
+    lanAllIpv6: "All IPv6 interfaces \xB7 ::",
+    lanLoopback: "This computer only",
+    lanUnavailableAddress: "Saved address; not currently detected",
+    lanAddressSelectionHint: "These addresses belong to the computer running DSH, not the browser device. Choose the LAN interface shared with your other computer. With all interfaces selected, connect using a real interface IP, not 0.0.0.0. Reopen this panel after changing networks to refresh the list.",
+    lanPort: "Port",
+    lanAccessToken: "Access token",
+    lanHostAddress: "Host IP or hostname",
+    lanAddHost: "Add connection",
+    lanEditHost: "Edit connection",
+    lanDeleteHost: "Delete connection",
+    lanDeleteConfirm: "Delete connection \u201C{name}\u201D?",
+    lanCancel: "Cancel",
+    lanSaved: "LAN settings saved",
+    lanInvalidAddress: "Enter a host address without a URL scheme or path",
+    lanInvalidPort: "Enter a port from 1 to 65535",
+    lanHostName: "Connection name",
+    lanOptionalToken: "Host access token (optional; at least 16 characters if provided)",
+    lanTokenTooShort: "Access token must contain at least 16 characters, excluding leading and trailing spaces",
+    lanEncrypted: "Encrypted direct connection. WebRTC and relay are not used.",
+    lanConnect: "Save and connect",
+    lanSaveListener: "Save listener settings",
+    lanLoadFailed: "Could not load LAN settings. Try again.",
     remoteTools: "Inject Remote Tools",
     remoteToolsHint: "Expose remote_* tools in sessions. On by default; turn it off when you do not need them. Changes apply after restarting the Host.",
     remoteToolsSaved: "Remote Tools setting saved.",
@@ -1632,8 +47,8 @@ Minimum version required to store current data is: ` + bestVersion + `.
     previewPort: "Host port",
     previewLocalOnly: "Preview requires Desktop or a browser connected to Harness on this computer.",
     settings: "Settings",
-    pluginTitle: "DeepSeek Remote",
-    pluginDescription: "P2P-based, end-to-end encrypted remote access to DeepSeek Harness, CodeX, Claude Code, Pi, and other workspaces from DSH Desktop, the web, iOS, and Android clients.",
+    pluginTitle: "DSH LAN",
+    pluginDescription: "Encrypted LAN access to Harness and agent workspaces using an IP address and port.",
     expandSettings: "Show settings: {name}",
     collapseSettings: "Hide settings: {name}",
     unsaved: "Unsaved",
@@ -1718,7 +133,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     connectionRateLimited: "The Server is receiving too many requests. Automatic retry will continue.",
     connectionVersionMismatch: "The Plugin and Server protocol versions are incompatible.",
     connectionInvalidResponse: "The Server returned an invalid control message.",
-    connectionReachability: "Cannot reach the Server. Check the network and Server address.",
+    connectionReachability: "Cannot reach the Host. Check its IP address, port and listener settings.",
     connectionUnexpected: "The connection stopped unexpectedly. Automatic retry will continue.",
     hostSignInHint: "Sign in to authorize this Host on the selected Server.",
     checkingHost: "Checking Host registration\u2026",
@@ -1729,8 +144,8 @@ Minimum version required to store current data is: ` + bestVersion + `.
     signingIn: "Signing in\u2026",
     useRegistrationCode: "Use connection code",
     registering: "Registering\u2026",
-    remoteEntry: "Remote",
-    remoteTitle: "DS Harness Remote - Remote Workspace",
+    remoteEntry: "LAN",
+    remoteTitle: "DSH LAN \xB7 Workspaces",
     remoteDescription: "Choose one of your Hosts, then select a working directory. The Harness interface stays on this device.",
     starProject: "Open source project, stars welcome~",
     chooseHost: "Host",
@@ -1743,9 +158,9 @@ Minimum version required to store current data is: ` + bestVersion + `.
     remoteProgressCheckingHost: "Checking Host",
     remoteProgressCheckingHostDetail: "Finding the selected device and checking whether it is online.",
     remoteProgressAuthorizingPeer: "Verifying authorization",
-    remoteProgressAuthorizingPeerDetail: "Confirming account membership and pinned Host identity.",
+    remoteProgressAuthorizingPeerDetail: "Verifying the access token and Host identity.",
     remoteProgressOpeningChannel: "Opening encrypted channel",
-    remoteProgressOpeningChannelDetail: "Trying LAN, P2P, TURN, then Relay if needed.",
+    remoteProgressOpeningChannelDetail: "Connecting directly to the configured IP address and port.",
     remoteProgressProbeLan: "Probing LAN",
     remoteProgressProbeLanDetail: "Checking whether the Host is reachable on the local network.",
     remoteProgressProbeP2p: "Probing P2P",
@@ -1801,7 +216,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     remoteNetworkRelay: "Relay",
     remoteNetworkLan: "LAN",
     remoteNetworkOffline: "Disconnected",
-    remoteLinkEncrypted: "End-to-end encrypted",
+    remoteLinkEncrypted: "Noise encrypted",
     connectionRouteTitle: "Connection route",
     connectionRouteFrom: "From",
     connectionRouteVia: "Via",
@@ -1897,6 +312,40 @@ Minimum version required to store current data is: ` + bestVersion + `.
     claudeVirtualWorkspace: "Claude virtual workspace",
     codexVirtualSessions: "Sessions"
   }, zh = {
+    lanTitle: "\u5C40\u57DF\u7F51\u8FDE\u63A5",
+    lanShowToken: "\u663E\u793A\u8BBF\u95EE\u4EE4\u724C",
+    lanHideToken: "\u9690\u85CF\u8BBF\u95EE\u4EE4\u724C",
+    lanListenerTokenHint: "\u81EA\u884C\u586B\u5199\u7684\u4EE4\u724C\u81F3\u5C11\u9700\u8981 16 \u4E2A\u5B57\u7B26\uFF08\u4E0D\u8BA1\u9996\u5C3E\u7A7A\u683C\uFF09\u3002\u9996\u6B21\u4FDD\u5B58\u65F6\u7559\u7A7A\u4F1A\u751F\u6210\u4EE4\u724C\uFF1B\u4E4B\u540E\u6E05\u7A7A\u4F1A\u4FDD\u7559\u539F\u4EE4\u724C\u3002\u663E\u793A\u5E76\u590D\u5236\u4FDD\u5B58\u540E\u7684\u4EE4\u724C\uFF0C\u586B\u5165\u53E6\u4E00\u53F0\u8BBE\u5907\u7684\u8FDE\u63A5\u8BBE\u7F6E",
+    lanTokenInvalid: "\u8FDE\u63A5\u88AB\u62D2\u7EDD\uFF0C\u8BF7\u68C0\u67E5\u4E3B\u673A\u8BBF\u95EE\u4EE4\u724C",
+    lanManageConnections: "\u7BA1\u7406\u8FDE\u63A5",
+    lanDirectHint: "\u901A\u8FC7 IP \u548C\u7AEF\u53E3\u76F4\u8FDE\uFF0C\u65E0\u9700\u8D26\u53F7\u6216\u4E2D\u7EE7\uFF1B\u901A\u4FE1\u4F7F\u7528 Noise \u52A0\u5BC6",
+    lanNoHosts: "\u6682\u65E0\u5C40\u57DF\u7F51\u4E3B\u673A\uFF0C\u8BF7\u5728\u300C\u7BA1\u7406\u8FDE\u63A5\u300D\u4E2D\u6DFB\u52A0 IP \u548C\u7AEF\u53E3",
+    lanListener: "\u76D1\u542C\u5C40\u57DF\u7F51\u8FDE\u63A5",
+    lanListenHint: "\u4EC5\u5728\u53EF\u4FE1\u7F51\u7EDC\u4E2D\u542F\u7528\uFF0C\u5EFA\u8BAE\u4F7F\u7528\u8BBF\u95EE\u4EE4\u724C\u9650\u5236\u4F20\u5165\u8FDE\u63A5",
+    lanBindAddress: "\u672C\u673A\u76D1\u542C\u5730\u5740",
+    lanAllIpv4: "\u6240\u6709 IPv4 \u7F51\u5361 \xB7 0.0.0.0",
+    lanAllIpv6: "\u6240\u6709 IPv6 \u7F51\u5361 \xB7 ::",
+    lanLoopback: "\u4EC5\u672C\u673A\u53EF\u8BBF\u95EE",
+    lanUnavailableAddress: "\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u5F53\u524D\u672A\u68C0\u6D4B\u5230\u6B64\u5730\u5740",
+    lanAddressSelectionHint: "\u8FD9\u91CC\u663E\u793A\u8FD0\u884C DSH \u7684\u7535\u8111\u5730\u5740\uFF0C\u4E0D\u662F\u6D4F\u89C8\u5668\u6240\u5728\u8BBE\u5907\u7684\u5730\u5740\u3002\u8BF7\u9009\u62E9\u4E0E\u53E6\u4E00\u53F0\u7535\u8111\u540C\u4E00\u5C40\u57DF\u7F51\u7684\u7F51\u5361\uFF1B\u9009\u62E9\u6240\u6709\u7F51\u5361\u65F6\uFF0C\u53E6\u4E00\u53F0\u7535\u8111\u4ECD\u9700\u586B\u5199\u5B9E\u9645\u7F51\u5361 IP\uFF0C\u800C\u4E0D\u662F 0.0.0.0\u3002\u5207\u6362\u7F51\u7EDC\u540E\u91CD\u65B0\u6253\u5F00\u9762\u677F\u53EF\u5237\u65B0\u5217\u8868",
+    lanPort: "\u7AEF\u53E3",
+    lanAccessToken: "\u8BBF\u95EE\u4EE4\u724C",
+    lanHostAddress: "\u4E3B\u673A IP \u6216\u57DF\u540D",
+    lanAddHost: "\u6DFB\u52A0\u8FDE\u63A5",
+    lanEditHost: "\u7F16\u8F91\u8FDE\u63A5",
+    lanDeleteHost: "\u5220\u9664\u8FDE\u63A5",
+    lanDeleteConfirm: "\u5220\u9664\u8FDE\u63A5\u300C{name}\u300D\uFF1F",
+    lanCancel: "\u53D6\u6D88",
+    lanSaved: "\u5C40\u57DF\u7F51\u8BBE\u7F6E\u5DF2\u4FDD\u5B58",
+    lanInvalidAddress: "\u8BF7\u8F93\u5165\u4E3B\u673A\u5730\u5740\uFF0C\u4E0D\u542B URL \u534F\u8BAE\u6216\u8DEF\u5F84",
+    lanInvalidPort: "\u8BF7\u8F93\u5165 1 \u81F3 65535 \u7684\u7AEF\u53E3",
+    lanHostName: "\u8FDE\u63A5\u540D\u79F0",
+    lanOptionalToken: "\u4E3B\u673A\u8BBF\u95EE\u4EE4\u724C\uFF08\u53EF\u9009\uFF1B\u586B\u5199\u65F6\u81F3\u5C11 16 \u4E2A\u5B57\u7B26\uFF09",
+    lanTokenTooShort: "\u8BBF\u95EE\u4EE4\u724C\u81F3\u5C11\u9700\u8981 16 \u4E2A\u5B57\u7B26\uFF08\u4E0D\u8BA1\u9996\u5C3E\u7A7A\u683C\uFF09",
+    lanEncrypted: "\u52A0\u5BC6\u76F4\u8FDE\uFF0C\u4E0D\u4F7F\u7528 WebRTC \u6216\u4E2D\u7EE7",
+    lanConnect: "\u4FDD\u5B58\u5E76\u8FDE\u63A5",
+    lanSaveListener: "\u4FDD\u5B58\u76D1\u542C\u8BBE\u7F6E",
+    lanLoadFailed: "\u65E0\u6CD5\u52A0\u8F7D\u5C40\u57DF\u7F51\u8BBE\u7F6E\uFF0C\u8BF7\u91CD\u8BD5",
     remoteTools: "\u6CE8\u5165 Remote Tools",
     remoteToolsHint: "\u5728\u4F1A\u8BDD\u4E2D\u6CE8\u5165 remote_* \u5DE5\u5177\u3002\u9ED8\u8BA4\u5F00\u542F\uFF1B\u4E0D\u9700\u8981\u65F6\u53EF\u5173\u95ED\uFF0C\u91CD\u542F Host \u540E\u751F\u6548\u3002",
     remoteToolsSaved: "Remote Tools \u8BBE\u7F6E\u5DF2\u4FDD\u5B58\u3002",
@@ -1908,8 +357,8 @@ Minimum version required to store current data is: ` + bestVersion + `.
     previewPort: "Host \u7AEF\u53E3",
     previewLocalOnly: "\u9884\u89C8\u9700\u8981 Desktop\uFF0C\u6216\u8FDE\u63A5\u5230\u672C\u673A Harness \u7684\u6D4F\u89C8\u5668\u3002",
     settings: "\u8BBE\u7F6E",
-    pluginTitle: "DeepSeek \u8FDC\u7A0B\u8FDE\u63A5",
-    pluginDescription: "\u57FA\u4E8E P2P \u7F51\u7EDC\uFF0C\u4F7F\u7528\u7AEF\u5230\u7AEF\u52A0\u5BC6\u8FDC\u7A0B\u8BBF\u95EE DeepSeek Harness\u3001CodeX\u3001Claude Code\u3001Pi \u7B49\u5DE5\u4F5C\u533A\uFF0C\u652F\u6301Web\u548C\u79FB\u52A8\u7AEF\u3002",
+    pluginTitle: "DSH \u5C40\u57DF\u7F51\u8FDE\u63A5",
+    pluginDescription: "\u901A\u8FC7 IP \u548C\u7AEF\u53E3\u52A0\u5BC6\u76F4\u8FDE\u5C40\u57DF\u7F51\u4E2D\u7684 Harness \u4E0E Agent \u5DE5\u4F5C\u533A\u3002",
     expandSettings: "\u5C55\u5F00\u8BBE\u7F6E\uFF1A{name}",
     collapseSettings: "\u6536\u8D77\u8BBE\u7F6E\uFF1A{name}",
     unsaved: "\u672A\u4FDD\u5B58",
@@ -1994,7 +443,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     connectionRateLimited: "Server \u8BF7\u6C42\u8FC7\u591A\uFF0C\u63D2\u4EF6\u5C06\u7EE7\u7EED\u81EA\u52A8\u91CD\u8BD5\u3002",
     connectionVersionMismatch: "Plugin \u4E0E Server \u7684\u534F\u8BAE\u7248\u672C\u4E0D\u517C\u5BB9\u3002",
     connectionInvalidResponse: "Server \u8FD4\u56DE\u4E86\u65E0\u6548\u7684\u63A7\u5236\u6D88\u606F\u3002",
-    connectionReachability: "\u65E0\u6CD5\u8FDE\u63A5 Server\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u548C Server \u5730\u5740\u3002",
+    connectionReachability: "\u65E0\u6CD5\u8FDE\u63A5\u4E3B\u673A\uFF0C\u8BF7\u68C0\u67E5 IP\u3001\u7AEF\u53E3\u4E0E\u76D1\u542C\u8BBE\u7F6E",
     connectionUnexpected: "\u8FDE\u63A5\u610F\u5916\u4E2D\u65AD\uFF0C\u63D2\u4EF6\u5C06\u7EE7\u7EED\u81EA\u52A8\u91CD\u8BD5\u3002",
     hostSignInHint: "\u767B\u5F55\u540E\u5728\u6240\u9009 Server \u4E0A\u6388\u6743\u6B64 Host\u3002",
     checkingHost: "\u6B63\u5728\u68C0\u67E5 Host \u6CE8\u518C\u72B6\u6001\u2026",
@@ -2005,8 +454,8 @@ Minimum version required to store current data is: ` + bestVersion + `.
     signingIn: "\u6B63\u5728\u767B\u5F55\u2026",
     useRegistrationCode: "\u4F7F\u7528\u8FDE\u63A5\u7801",
     registering: "\u6B63\u5728\u6CE8\u518C\u2026",
-    remoteEntry: "Remote",
-    remoteTitle: "DS Harness Remote - \u8FDC\u7A0B\u5DE5\u4F5C\u53F0",
+    remoteEntry: "LAN",
+    remoteTitle: "DSH LAN \xB7 \u5DE5\u4F5C\u533A",
     remoteDescription: "\u9009\u62E9\u60F3\u8981\u8FDE\u63A5\u4E3B\u673A\u548C\u5DE5\u4F5C\u76EE\u5F55\u3002",
     starProject: "\u5F00\u6E90\u9879\u76EE\uFF0C\u6B22\u8FCEStar~",
     chooseHost: "\u4E3B\u673A",
@@ -2019,9 +468,9 @@ Minimum version required to store current data is: ` + bestVersion + `.
     remoteProgressCheckingHost: "\u6B63\u5728\u68C0\u67E5 Host",
     remoteProgressCheckingHostDetail: "\u6B63\u5728\u67E5\u627E\u6240\u9009\u8BBE\u5907\u5E76\u786E\u8BA4\u662F\u5426\u5728\u7EBF\u3002",
     remoteProgressAuthorizingPeer: "\u6B63\u5728\u9A8C\u8BC1\u6388\u6743",
-    remoteProgressAuthorizingPeerDetail: "\u6B63\u5728\u786E\u8BA4\u8D26\u53F7\u6210\u5458\u5173\u7CFB\u548C\u5DF2\u56FA\u5B9A\u7684 Host \u8EAB\u4EFD\u3002",
+    remoteProgressAuthorizingPeerDetail: "\u6B63\u5728\u9A8C\u8BC1\u8BBF\u95EE\u4EE4\u724C\u4E0E\u4E3B\u673A\u8EAB\u4EFD",
     remoteProgressOpeningChannel: "\u6B63\u5728\u5EFA\u7ACB\u52A0\u5BC6\u901A\u9053",
-    remoteProgressOpeningChannelDetail: "\u4F9D\u6B21\u5C1D\u8BD5\u5C40\u57DF\u7F51\u3001P2P\u3001TURN\uFF0C\u5FC5\u8981\u65F6\u56DE\u843D\u5230 Relay\u3002",
+    remoteProgressOpeningChannelDetail: "\u6B63\u5728\u76F4\u8FDE\u914D\u7F6E\u7684 IP \u5730\u5740\u4E0E\u7AEF\u53E3",
     remoteProgressProbeLan: "\u6B63\u5728\u63A2\u6D4B\u5C40\u57DF\u7F51",
     remoteProgressProbeLanDetail: "\u68C0\u67E5\u5F53\u524D\u8BBE\u5907\u662F\u5426\u80FD\u901A\u8FC7\u672C\u5730\u7F51\u7EDC\u76F4\u8FDE Host\u3002",
     remoteProgressProbeP2p: "\u6B63\u5728\u63A2\u6D4B P2P",
@@ -2077,7 +526,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     remoteNetworkRelay: "\u4E2D\u7EE7",
     remoteNetworkLan: "\u5C40\u57DF\u7F51",
     remoteNetworkOffline: "\u5DF2\u65AD\u5F00",
-    remoteLinkEncrypted: "\u7AEF\u5230\u7AEF\u52A0\u5BC6",
+    remoteLinkEncrypted: "Noise \u52A0\u5BC6",
     connectionRouteTitle: "\u8FDE\u63A5\u7EBF\u8DEF",
     connectionRouteFrom: "\u8D77\u70B9",
     connectionRouteVia: "\u7ECF\u8FC7",
@@ -2175,7 +624,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   };
 
   // src/client/presentation.ts
-  var defaultPreferredTransports = ["lan", "p2p", "turn", "relay"];
+  var defaultPreferredTransports = ["lan"];
   function normalizedPreferredTransports(value) {
     return value === void 0 || value.length === 0 ? [...defaultPreferredTransports] : [...value];
   }
@@ -2265,13 +714,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     };
   }
   function connectionErrorMessage(code, t) {
-    return t(code === "ACCOUNT_AUTH_REQUIRED" || code === "AUTH_REQUIRED" ? "hostSignInHint" : code === "AUTH_INVALID" || code === "TOKEN_EXPIRED" ? "connectionAuthorizationExpired" : code === "CONNECTION_REPLACED" ? "connectionReplaced" : code === "SERVER_CREDENTIALS_BUSY" ? "connectionCredentialsBusy" : code === "DEVICE_REVOKED" ? "connectionDeviceRevoked" : code === "DEVICE_OWNERSHIP_REQUIRED" ? "connectionOwnershipRequired" : code === "RATE_LIMITED" ? "connectionRateLimited" : code === "UNSUPPORTED_VERSION" ? "connectionVersionMismatch" : code === "INVALID_MESSAGE" ? "connectionInvalidResponse" : code === "CONNECTION_FAILED" || code === "SERVER_NOT_CONFIGURED" ? "connectionReachability" : "connectionUnexpected");
-  }
-  function connectionStatusLabel(status, t) {
-    return status === void 0 ? t("checkingConnection") : status.online ? t("online") : status.reconnecting ? t(status.lastActiveAt === void 0 && status.error === void 0 ? "connecting" : "reconnecting") : t("offline");
-  }
-  function connectionStatusClass(status) {
-    return status?.online ? " isOnline" : status?.reconnecting ? " isReconnecting" : status === void 0 ? "" : " isOffline";
+    return t(code === "LAN_HOST_NOT_FOUND" ? "lanNoHosts" : code === "LAN_CONNECTION_FAILED" ? "connectionReachability" : code === "LAN_AUTH_INVALID" ? "lanTokenInvalid" : code === "ACCOUNT_AUTH_REQUIRED" ? "connectionReachability" : code === "AUTH_REQUIRED" || code === "AUTH_INVALID" || code === "TOKEN_EXPIRED" ? "lanTokenInvalid" : code === "CONNECTION_REPLACED" ? "connectionReplaced" : code === "SERVER_CREDENTIALS_BUSY" ? "connectionCredentialsBusy" : code === "DEVICE_REVOKED" ? "connectionDeviceRevoked" : code === "DEVICE_OWNERSHIP_REQUIRED" ? "connectionOwnershipRequired" : code === "RATE_LIMITED" ? "connectionRateLimited" : code === "UNSUPPORTED_VERSION" ? "connectionVersionMismatch" : code === "INVALID_MESSAGE" ? "connectionInvalidResponse" : code === "CONNECTION_FAILED" || code === "SERVER_NOT_CONFIGURED" ? "connectionReachability" : "connectionUnexpected");
   }
   function messageOf(reason) {
     return reason instanceof Error ? reason.message : String(reason);
@@ -2351,7 +794,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
         } finally {
           setBusy(!1);
         }
-      }, transport = status.network?.webRtc?.mode ?? status.transport ?? "Disconnected", networkLabel = t(transport === "P2P" ? "remoteNetworkP2p" : transport === "TURN" ? "remoteNetworkTurn" : transport === "Relay" ? "remoteNetworkRelay" : transport === "LAN" ? "remoteNetworkLan" : "remoteNetworkOffline"), networkOnline = status.connected === !0 && transport !== "Disconnected", routeVia = t(transport === "P2P" ? "connectionRouteP2p" : transport === "TURN" ? "connectionRouteTurn" : transport === "Relay" ? "connectionRouteRelay" : "connectionRouteLan"), routeViaDetail = t(transport === "P2P" ? "connectionRouteP2pDetail" : transport === "TURN" ? "connectionRouteTurnDetail" : transport === "Relay" ? "connectionRouteRelayDetail" : "connectionRouteLanDetail"), network = status.network, webRtc = network?.webRtc, controlStateLabel = network?.controlChannelState === "connecting" ? t("controlStateConnecting") : network?.controlChannelState === "open" ? t("controlStateOpen") : network?.controlChannelState === "closing" ? t("controlStateClosing") : t("controlStateClosed"), detailValue = (value) => value === void 0 || value === "" ? t("notProvided") : String(value), candidateLabel = (value) => value === "host" ? t("candidateHost") : value === "srflx" ? t("candidateSrflx") : value === "prflx" ? t("candidatePrflx") : value === "relay" ? t("candidateRelay") : detailValue(value), fact = (label, value, mono = !1) => React.createElement(
+      }, transport = status.transport ?? "Disconnected", networkLabel = t(transport === "P2P" ? "remoteNetworkP2p" : transport === "TURN" ? "remoteNetworkTurn" : transport === "Relay" ? "remoteNetworkRelay" : transport === "LAN" ? "remoteNetworkLan" : "remoteNetworkOffline"), networkOnline = status.connected === !0 && transport !== "Disconnected", routeVia = t(transport === "P2P" ? "connectionRouteP2p" : transport === "TURN" ? "connectionRouteTurn" : transport === "Relay" ? "connectionRouteRelay" : "connectionRouteLan"), routeViaDetail = t(transport === "P2P" ? "connectionRouteP2pDetail" : transport === "TURN" ? "connectionRouteTurnDetail" : transport === "Relay" ? "connectionRouteRelayDetail" : "connectionRouteLanDetail"), network = status.network, webRtc = status.lan === void 0 ? network?.webRtc : void 0, controlStateLabel = network?.controlChannelState === "connecting" ? t("controlStateConnecting") : network?.controlChannelState === "open" ? t("controlStateOpen") : network?.controlChannelState === "closing" ? t("controlStateClosing") : t("controlStateClosed"), detailValue = (value) => value === void 0 || value === "" ? t("notProvided") : String(value), candidateLabel = (value) => value === "host" ? t("candidateHost") : value === "srflx" ? t("candidateSrflx") : value === "prflx" ? t("candidatePrflx") : value === "relay" ? t("candidateRelay") : detailValue(value), fact = (label, value, mono = !1) => React.createElement(
         "div",
         null,
         React.createElement("dt", null, label),
@@ -2461,7 +904,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
               fact(t("bytesReceived"), webRtc.bytesReceived === void 0 ? t("notProvided") : formatByteSize(webRtc.bytesReceived))
             )
           ),
-          React.createElement("p", null, t("connectionRouteEncrypted"))
+          React.createElement("p", null, t(status.lan === void 0 ? "connectionRouteEncrypted" : "lanEncrypted"))
         )) : null
       );
     }
@@ -2531,151 +974,51 @@ Minimum version required to store current data is: ` + bestVersion + `.
     return snapshot.baselinesReady === !0 || snapshot.phase === "ready";
   }
 
-  // src/client/progress.ts
-  function createRemoteProgressView(React) {
-    function RemoteProgressView(props) {
-      let progress = props.progress;
-      if (progress === void 0) return null;
-      let percent = Math.max(0, Math.min(100, Math.round(progress.percent))), activeTransports = new Set(progress.activeTransports ?? []), detail = progress.transports !== void 0 && activeTransports.size > 0 ? React.createElement(
-        "span",
-        { className: "dshRemoteProgressRoute" },
-        props.t(progress.routeVerb === "using" ? "remoteProgressUsingPrefix" : "remoteProgressTryingPrefix"),
-        progress.transports.map((transport, index) => React.createElement(
-          React.Fragment,
-          { key: `${transport}:${index}` },
-          index === 0 ? null : React.createElement("span", { className: "dshRemoteProgressRouteArrow", "aria-hidden": !0 }, " -> "),
-          React.createElement("span", {
-            className: activeTransports.has(transport) ? "isActive" : void 0
-          }, transportDiagnosticLabel(transport))
-        ))
-      ) : props.t(progress.detail);
-      return React.createElement(
-        "div",
-        {
-          className: "dshRemoteProgress",
-          role: "status",
-          "aria-live": "polite"
-        },
-        React.createElement(
-          "div",
-          { className: "dshRemoteProgressHeader" },
-          React.createElement("strong", null, props.t(progress.label)),
-          React.createElement("span", null, `${percent}%`)
-        ),
-        React.createElement("p", null, detail),
-        React.createElement("div", {
-          className: "dshRemoteProgressBar",
-          role: "progressbar",
-          "aria-valuemin": 0,
-          "aria-valuemax": 100,
-          "aria-valuenow": percent,
-          "aria-label": props.t(progress.label)
-        }, React.createElement("span", { style: { transform: `scaleX(${percent / 100})` } }))
-      );
-    }
-    return RemoteProgressView;
-  }
-  async function runConnectHostProgress(preferredTransports, targetDeviceId, control, connectedStep, setProgress, progressRun, action, readyProgress) {
-    let runId = progressRun.current + 1;
-    progressRun.current = runId;
-    let polling = !0, pollTimer, connectedAt, apply = (next) => {
-      progressRun.current === runId && setProgress(next);
-    }, poll = async () => {
-      try {
-        let status = await control("status");
-        if (!polling || progressRun.current !== runId) return;
-        (status.connectionProgress?.phase === "connected" || status.connectedTargetDeviceId === targetDeviceId) && connectedAt === void 0 && (connectedAt = Date.now());
-        let next = observedConnectionProgress(status, targetDeviceId, preferredTransports, connectedStep, connectedAt);
-        next !== void 0 && apply(next);
-      } catch {
-      } finally {
-        polling && progressRun.current === runId && (pollTimer = window.setTimeout(() => {
-          poll();
-        }, 300));
-      }
-    };
-    apply({ label: "remoteProgressCheckingHost", detail: "remoteProgressCheckingHostDetail", percent: 12 });
-    let pending = action();
-    poll();
-    try {
-      let result = await pending;
-      return polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), apply(readyProgress?.(result) ?? { label: "remoteProgressReady", detail: "remoteProgressReadyDetail", percent: 100 }), await new Promise((resolve) => window.setTimeout(resolve, 520)), result;
-    } finally {
-      polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), progressRun.current === runId && setProgress(void 0);
-    }
-  }
+  // src/client/styles.ts
+  var lanStyles = `
+.dshLanSettings { display: grid; gap: 12px; min-width: 0; }
+.dshLanSettings form, .dshLanListener { display: grid; gap: 12px; }
+.dshLanFields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, .4fr); gap: 12px; }
+.dshLanSettings label { display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.dshLanSettings input { box-sizing: border-box; width: 100%; min-width: 0; padding: 8px 10px; color: inherit; background: var(--dsw-alias-bg-layer-3); border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; font: inherit; }
+.dshLanSettings input[type=checkbox] { width: auto; }
+.dshLanSettings button { font: inherit; font-weight: 500; color: inherit; border: 1px solid var(--dsw-alias-border-l2); background: transparent; border-radius: 8px; padding: 6px 10px; }
+.dshLanSettings button:disabled { opacity: .5; }
+.dshLanActions, .dshLanRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dshLanRow { justify-content: space-between; }
+.dshLanRow > span { min-width: 0; overflow-wrap: anywhere; }
+.dshLanRow strong { font-weight: 500; }
+.dshLanSettings strong { font-weight: 500; }
+.dshLanSettings button:focus-visible, .dshLanSettings input:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.dshLanSettings button:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); cursor: pointer; }
+.dshLanSettings [role=progressbar] { display: block; width: 20px; height: 20px; margin: 20px auto; border: 2px solid var(--dsw-alias-border-l2); border-top-color: var(--dsw-alias-brand-primary); border-radius: 50%; animation: dshLanSpin 1s linear infinite; }
+@keyframes dshLanSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dshLanSettings [role=progressbar] { animation: none; } }
+.dshLanSettings p { margin: 0; font-size: 13px; }
+.dshLanSettings > p:last-child { min-height: 20px; }
+.dshLanSettings ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.dshLanManager { margin-block: 12px; }
+.dshLanManager summary { cursor: pointer; margin-bottom: 12px; font-weight: 500; }
+@media (max-width: 520px) { .dshLanFields { grid-template-columns: minmax(0, 1fr); } }
+`;
 
   // src/client/settings.ts
   function createRemotePluginOptions(React) {
     function RemotePluginOptions(props) {
-      let { t } = props, [open, setOpen] = React.useState(props.view === "page"), [serverUrl, setServerUrl] = React.useState(""), [remoteToolsBusy, setRemoteToolsBusy] = React.useState(!1), [remoteToolsEnabled, setRemoteToolsEnabled] = React.useState(!0), role = "host", [associations, setAssociations] = React.useState({}), [loaded, setLoaded] = React.useState(!1), [writable, setWritable] = React.useState(!1), [busy, setBusy] = React.useState(!1), [terminalEnabled, setTerminalEnabled] = React.useState(!1), [terminalBusy, setTerminalBusy] = React.useState(!1), [acpBackends, setAcpBackends] = React.useState([]), [acpAvailability, setAcpAvailability] = React.useState({}), [acpChecking, setAcpChecking] = React.useState({}), [acpCheckResults, setAcpCheckResults] = React.useState({}), [reconnectBusy, setReconnectBusy] = React.useState(!1), [hostStatus, setHostStatus] = React.useState(void 0), [hostName, setHostName] = React.useState(""), [hostDeviceId, setHostDeviceId] = React.useState(""), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0), [settingsView, setSettingsView] = React.useState(void 0), associationReadRun = React.useRef(0), association = associations.client ?? associations.host, applyAssociations = (view) => {
-        setAssociations(view.associations ?? (view.association === void 0 ? {} : { host: view.association }));
-      }, applyView = (view, updateAssociations = !0) => {
-        setSettingsView(view), setServerUrl(view.config.serverUrl ?? "https://dsh.r2049.cn"), setTerminalEnabled(view.config.terminal?.enabled ?? !0), setRemoteToolsEnabled(view.config.remoteTools?.enabled ?? !0), setAcpBackends((view.config.acp?.backends ?? []).map((item) => ({ id: item.id, enabled: item.enabled !== !1 }))), setAcpAvailability(view.acpAvailability ?? {}), updateAssociations && applyAssociations(view), setWritable(view.writable), setLoaded(!0);
-      }, load = async () => {
-        let run = ++associationReadRun.current, [view, status] = await Promise.all([
-          props.control("settings.get"),
-          props.control("status").catch(() => {
-          })
-        ]);
-        applyView(view, run === associationReadRun.current), setHostStatus(status?.host), setHostName(status?.deviceName ?? ""), setHostDeviceId(status?.host?.deviceId ?? "");
+      let { t } = props, [remoteToolsBusy, setRemoteToolsBusy] = React.useState(!1), [remoteToolsEnabled, setRemoteToolsEnabled] = React.useState(!0), [loaded, setLoaded] = React.useState(!1), [writable, setWritable] = React.useState(!1), [busy, setBusy] = React.useState(!1), [terminalEnabled, setTerminalEnabled] = React.useState(!1), [terminalBusy, setTerminalBusy] = React.useState(!1), [acpBackends, setAcpBackends] = React.useState([]), [acpAvailability, setAcpAvailability] = React.useState({}), [acpChecking, setAcpChecking] = React.useState({}), [acpCheckResults, setAcpCheckResults] = React.useState({}), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0), [settingsView, setSettingsView] = React.useState(void 0), applyView = (view) => {
+        setSettingsView(view), setTerminalEnabled(view.config.terminal?.enabled ?? !0), setRemoteToolsEnabled(view.config.remoteTools?.enabled ?? !0), setAcpBackends((view.config.acp?.backends ?? []).map((item) => ({ id: item.id, enabled: item.enabled !== !1 }))), setAcpAvailability(view.acpAvailability ?? {}), setWritable(view.writable), setLoaded(!0);
       };
       React.useEffect(() => {
-        load().catch((reason) => setError(messageOf(reason)));
-      }, []), React.useEffect(() => {
-        let active = !0, authorizationKey, unsubscribe = props.statusFeed.subscribe((status) => {
-          setHostStatus(status.host), setHostName(status.deviceName ?? ""), setHostDeviceId(status.host?.deviceId ?? "");
-          let key = JSON.stringify([
-            status.serverUrl,
-            status.deviceId,
-            status.host?.deviceId,
-            status.host?.authorized,
-            status.host?.account
-          ]);
-          if (key === authorizationKey) return;
-          authorizationKey = key;
-          let run = ++associationReadRun.current;
-          props.control("settings.get").then((view) => {
-            active && run === associationReadRun.current && applyView(view);
-          }).catch(() => {
-          });
-        });
-        return () => {
-          active = !1, unsubscribe();
+        let active = !0;
+        return props.control("settings.get").then((view) => {
+          active && applyView(view);
+        }).catch((reason) => {
+          active && setError(messageOf(reason));
+        }), () => {
+          active = !1;
         };
-      }, [props.statusFeed]);
-      let logout = async () => {
-        let run = ++associationReadRun.current;
-        setBusy(!0), setError(void 0), setNotice(void 0);
-        try {
-          let view = await props.control("settings.logout");
-          applyView(view, run === associationReadRun.current), setNotice({ key: "signedOut" });
-        } catch (reason) {
-          setError(messageOf(reason));
-        } finally {
-          setBusy(!1);
-        }
-      }, reconnectHost = async () => {
-        setReconnectBusy(!0), setError(void 0), setNotice(void 0);
-        try {
-          let status = await props.control("host.reconnect");
-          setHostStatus(status.host), setNotice({ key: "reconnectStarted" });
-        } catch (reason) {
-          setError(messageOf(reason));
-        } finally {
-          setReconnectBusy(!1);
-        }
-      }, setCurrentDeviceControl = async (enabled) => {
-        setBusy(!0), setError(void 0), setNotice(void 0);
-        try {
-          let status = await props.control("host.authorization.set", { enabled });
-          setHostStatus(status.host);
-        } catch (reason) {
-          setError(messageOf(reason));
-        } finally {
-          setBusy(!1);
-        }
-      }, setTerminalRemote = async (enabled) => {
+      }, []);
+      let setTerminalRemote = async (enabled) => {
         let previous = terminalEnabled;
         setTerminalEnabled(enabled), setTerminalBusy(!0), setError(void 0), setNotice(void 0);
         try {
@@ -2803,172 +1146,191 @@ Minimum version required to store current data is: ` + bestVersion + `.
         )
       );
       return props.view === "summary" ? React.createElement("span", null, t("pluginDescription")) : React.createElement(
-        props.view === "page" ? "div" : "li",
-        { className: `dshRemotePluginCard${open ? " isOpen" : ""}${props.view === "page" ? " dshRemotePluginModern" : ""}` },
+        "div",
+        { className: "dshRemotePluginCard dshRemotePluginModern isOpen" },
         React.createElement(
           "div",
           { className: "dshRemotePluginCardHeader" },
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: "dshRemotePluginCardToggle",
-              "aria-expanded": open,
-              "aria-label": t(open ? "collapseSettings" : "expandSettings", { name: t("pluginTitle") }),
-              onClick: () => setOpen((current) => !current)
-            },
-            React.createElement(
-              "span",
-              { className: "dshRemotePluginCardHeading" },
-              React.createElement("strong", null, t("pluginTitle")),
-              React.createElement("span", null, t("pluginDescription"))
-            ),
-            association === void 0 ? null : React.createElement("span", {
-              className: `dshRemotePluginCardStatus${connectionStatusClass(hostStatus)}`
-            }, hostStatus === void 0 ? t("associated") : connectionStatusLabel(hostStatus, t)),
-            React.createElement("span", { className: "dshRemotePluginCardChevron", "aria-hidden": !0 }, "\u2304")
-          )
+          React.createElement("strong", null, t("lanTitle"))
         ),
-        open ? React.createElement(
+        React.createElement(
           "div",
           { className: "dshRemotePluginCardBody" },
-          loaded ? association !== void 0 ? React.createElement(
-            "div",
-            { className: "dshRemoteSettings" },
-            React.createElement(
-              "div",
-              { className: "dshRemoteSettingsTop" },
-              React.createElement(
-                "div",
-                { className: "dshRemoteAssociation" },
-                React.createElement("span", null, t(association.account === void 0 ? "authorization" : "account")),
-                React.createElement("strong", null, association.account ?? t("authorizationComplete")),
-                React.createElement("p", null, association.account === void 0 ? serverUrl : t("authorizedOn", { role: "Remote", serverUrl }))
-              )
-            ),
-            React.createElement(
-              "div",
-              { className: "dshRemoteHostIdentity" },
-              React.createElement(
-                "div",
-                null,
-                React.createElement("span", null, t("hostName")),
-                React.createElement("strong", null, hostName || "\u2014")
-              ),
-              React.createElement(
-                "div",
-                null,
-                React.createElement("span", null, t("deviceId")),
-                React.createElement("code", null, hostDeviceId || "\u2014")
-              )
-            ),
-            developmentSetting,
-            acpSetting,
-            React.createElement(
-              "div",
-              { className: "dshRemoteAuthorizationSetting" },
-              React.createElement(
-                "div",
-                null,
-                React.createElement("strong", null, t("allowControlCurrentDevice")),
-                React.createElement("p", null, t("thisMachineHost"))
-              ),
-              React.createElement("input", {
-                type: "checkbox",
-                role: "switch",
-                disabled: busy,
-                "aria-label": t("allowControlCurrentDevice"),
-                checked: hostStatus?.authorized === !0,
-                onChange: (event) => void setCurrentDeviceControl(event.target.checked)
-              })
-            ),
-            React.createElement(
-              "div",
-              { className: "dshRemoteConnection", "aria-live": "polite" },
-              React.createElement(
-                "div",
-                { className: "dshRemoteConnectionSummary" },
-                React.createElement("span", null, t("connection")),
-                React.createElement(
-                  "strong",
-                  null,
-                  React.createElement("span", {
-                    className: `dshRemoteConnectionDot${connectionStatusClass(hostStatus)}`,
-                    "aria-hidden": !0
-                  }),
-                  connectionStatusLabel(hostStatus, t)
-                ),
-                React.createElement("p", null, hostStatus === void 0 ? t("checkingConnection") : hostStatus.lastActiveAt === void 0 ? t("neverConnected") : t("lastActive", { time: formatLocalTime(hostStatus.lastActiveAt) }))
-              ),
-              React.createElement("button", {
-                type: "button",
-                className: "dshRemoteReconnect",
-                disabled: reconnectBusy || hostStatus?.configured === !1,
-                onClick: () => void reconnectHost()
-              }, t(reconnectBusy ? "reconnectingAction" : "reconnect"))
-            ),
-            hostStatus?.error === void 0 || hostStatus.online ? null : React.createElement("p", { className: "dshRemoteConnectionIssue", role: "status" }, connectionErrorMessage(hostStatus.error, t)),
-            writable ? null : React.createElement("p", { className: "dshRemoteError" }, t("readOnly")),
-            React.createElement(
-              "div",
-              { className: "dshRemoteSettingsFooter" },
-              React.createElement("p", {
-                className: error !== void 0 ? "dshRemoteError" : "dshRemoteNotice",
-                role: error !== void 0 ? "alert" : "status"
-              }, error ?? (notice === void 0 ? "" : t(notice.key, notice.params))),
-              React.createElement("button", {
-                type: "button",
-                className: "dshRemoteDiscard",
-                disabled: busy || !writable,
-                onClick: () => void logout()
-              }, t(busy ? "signingOut" : "signOut"))
-            )
-          ) : React.createElement(
-            "div",
-            { className: "dshRemoteSettings" },
-            React.createElement(
-              "div",
-              { className: "dshRemoteHostIdentity" },
-              React.createElement(
-                "div",
-                null,
-                React.createElement("span", null, t("hostName")),
-                React.createElement("strong", null, hostName || "\u2014")
-              ),
-              React.createElement(
-                "div",
-                null,
-                React.createElement("span", null, t("deviceId")),
-                React.createElement("code", null, hostDeviceId || "\u2014")
-              )
-            ),
-            developmentSetting,
-            acpSetting,
-            React.createElement(
-              "div",
-              { className: "dshRemoteSettingsSignIn" },
-              React.createElement("p", { className: "dshRemoteSettingsState" }, t("authorizeFromRemote")),
-              React.createElement("button", {
-                type: "button",
-                className: "dshRemoteSave",
-                disabled: busy || !loaded,
-                onClick: props.onSignIn
-              }, t("signInAccount"))
-            ),
-            writable ? null : React.createElement("p", { className: "dshRemoteError" }, t("readOnly")),
-            error !== void 0 || notice !== void 0 ? React.createElement(
-              "div",
-              { className: "dshRemoteSettingsFooter" },
-              React.createElement("p", {
-                className: error !== void 0 ? "dshRemoteError" : "dshRemoteNotice",
-                role: error !== void 0 ? "alert" : "status"
-              }, error ?? t(notice.key, notice.params))
-            ) : null
-          ) : React.createElement("p", { className: "dshRemoteSettingsState" }, error ?? t("loadingSettings"))
-        ) : null
+          React.createElement(LanSettingsPanel, { control: props.control, t }),
+          loaded ? developmentSetting : null,
+          loaded ? acpSetting : null,
+          error === void 0 && notice === void 0 ? null : React.createElement("p", { className: error === void 0 ? "dshRemoteNotice" : "dshRemoteError", role: error === void 0 ? "status" : "alert" }, error ?? t(notice.key, notice.params))
+        )
       );
     }
+    let LanSettingsPanel = createLanSettingsPanel(React);
     return RemotePluginOptions;
+  }
+  function createLanSettingsPanel(React) {
+    return function(props) {
+      let { t } = props, [view, setView] = React.useState(void 0), [busy, setBusy] = React.useState(!1), [error, setError] = React.useState(void 0), [notice, setNotice] = React.useState(!1), [editing, setEditing] = React.useState(void 0), [deleting, setDeleting] = React.useState(void 0), [name, setName] = React.useState(""), [host, setHost] = React.useState(""), [port, setPort] = React.useState(""), [token, setToken] = React.useState(""), [listenerTokenVisible, setListenerTokenVisible] = React.useState(!1), load = async () => {
+        try {
+          setView(await props.control("lan.settings.get")), setError(void 0);
+        } catch {
+          setError(t("lanLoadFailed"));
+        }
+      };
+      React.useEffect(() => {
+        load();
+      }, []);
+      let validPort = (value) => /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535, save = async (patch) => {
+        setBusy(!0), setError(void 0), setNotice(!1);
+        try {
+          return await props.control("lan.settings.set", patch), setView(await props.control("lan.settings.get")), setNotice(!0), await props.onChanged?.(), !0;
+        } catch (reason) {
+          return setError(messageOf(reason)), !1;
+        } finally {
+          setBusy(!1);
+        }
+      }, editHost = (entry) => {
+        setEditing(entry), setName(entry?.name ?? ""), setHost(entry?.host ?? ""), setPort(entry === void 0 ? "" : String(entry.port)), setToken(entry?.accessToken ?? ""), setError(void 0), setNotice(!1);
+      }, submitHost = async (connect = !1) => {
+        if (view === void 0) return;
+        let address = host.trim();
+        if (!address || /[\s/?#@]/.test(address) || address.includes("://")) {
+          setError(t("lanInvalidAddress"));
+          return;
+        }
+        if (!validPort(port)) {
+          setError(t("lanInvalidPort"));
+          return;
+        }
+        if (token !== "" && token.trim().length < 16) {
+          setError(t("lanTokenTooShort"));
+          return;
+        }
+        let entry = { id: editing?.id ?? crypto.randomUUID(), name: name.trim() || address, host: address, port: Number(port), ...token === "" ? {} : { accessToken: token } };
+        if (await save({ hosts: editing === void 0 ? [...view.config.hosts, entry] : view.config.hosts.map((item) => item.id === entry.id ? entry : item) }) && (setEditing(void 0), setName(""), setHost(""), setPort(""), setToken(""), connect))
+          try {
+            await props.onConnect?.(entry.id);
+          } catch (reason) {
+            setError(messageOf(reason));
+          }
+      }, field = (label, value, change, type = "text") => React.createElement(
+        "label",
+        null,
+        React.createElement("span", null, label),
+        React.createElement("input", {
+          type,
+          value,
+          disabled: busy || !view?.writable,
+          autoComplete: "off",
+          onChange: (event) => change(event.target.value)
+        })
+      );
+      if (view === void 0) return React.createElement(
+        "div",
+        { className: "dshLanSettings" },
+        error === void 0 ? React.createElement("span", { role: "progressbar", "aria-label": t("loadingSettings") }) : React.createElement(
+          "div",
+          null,
+          React.createElement("p", { role: "alert" }, error),
+          React.createElement("button", { type: "button", onClick: () => void load() }, t("refreshRemoteShort"))
+        )
+      );
+      let config = view.config, update = (patch) => setView({ ...view, config: { ...config, ...patch } }), bindOptions = [
+        { address: "0.0.0.0", label: t("lanAllIpv4") },
+        ...(view.interfaces ?? []).filter((item) => item.family === "IPv4" && !item.internal && !item.address.startsWith("127.")).map((item) => ({ address: item.address, label: `${item.name} \xB7 ${item.address} \xB7 ${item.family}` }))
+      ];
+      return bindOptions.some((item) => item.address === config.bindAddress) || bindOptions.push({ address: config.bindAddress, label: `${config.bindAddress} \xB7 ${t("lanUnavailableAddress")}`, disabled: !0 }), React.createElement(
+        "section",
+        { className: "dshLanSettings" },
+        React.createElement("style", null, lanStyles),
+        React.createElement("p", null, t("lanDirectHint")),
+        React.createElement("ul", null, config.hosts.map((entry) => React.createElement(
+          "li",
+          { className: "dshLanRow", key: entry.id },
+          React.createElement("span", null, React.createElement("strong", null, entry.name), " \xB7 ", `${entry.host}:${entry.port}`),
+          deleting === entry.id ? React.createElement(
+            "div",
+            { className: "dshLanActions" },
+            React.createElement("span", null, t("lanDeleteConfirm", { name: entry.name })),
+            React.createElement("button", { type: "button", disabled: busy || !view.writable, onClick: () => void save({ hosts: config.hosts.filter((item) => item.id !== entry.id) }).then((ok) => {
+              ok && setDeleting(void 0);
+            }) }, t("lanDeleteHost")),
+            React.createElement("button", { type: "button", disabled: busy, onClick: () => setDeleting(void 0) }, t("lanCancel"))
+          ) : React.createElement(
+            "div",
+            { className: "dshLanActions" },
+            React.createElement("button", { type: "button", disabled: busy || !view.writable, onClick: () => editHost(entry) }, t("lanEditHost")),
+            React.createElement("button", { type: "button", disabled: busy || !view.writable, onClick: () => setDeleting(entry.id) }, t("lanDeleteHost"))
+          )
+        ))),
+        React.createElement(
+          "form",
+          { onSubmit: (event) => {
+            event.preventDefault(), submitHost();
+          } },
+          React.createElement("strong", null, t(editing === void 0 ? "lanAddHost" : "lanEditHost")),
+          field(t("lanHostName"), name, setName),
+          React.createElement("div", { className: "dshLanFields" }, field(t("lanHostAddress"), host, setHost), field(t("lanPort"), port, setPort, "number")),
+          field(t("lanOptionalToken"), token, setToken, "password"),
+          React.createElement(
+            "div",
+            { className: "dshLanActions" },
+            React.createElement("button", { type: "submit", disabled: busy || !view.writable || host.trim() === "" }, t(busy ? "saving" : "save")),
+            props.onConnect === void 0 ? null : React.createElement("button", { type: "button", disabled: busy || !view.writable || host.trim() === "", onClick: () => void submitHost(!0) }, t("lanConnect")),
+            editing === void 0 ? null : React.createElement("button", { type: "button", disabled: busy, onClick: () => editHost() }, t("lanCancel"))
+          )
+        ),
+        React.createElement(
+          "details",
+          null,
+          React.createElement("summary", null, t("lanListener")),
+          React.createElement(
+            "div",
+            { className: "dshLanListener" },
+            React.createElement("p", null, t("lanListenHint")),
+            React.createElement("label", null, t("lanListener"), React.createElement("input", { type: "checkbox", role: "switch", "aria-checked": config.enabled, checked: config.enabled, disabled: busy || !view.writable, onChange: (event) => update({ enabled: event.target.checked }) })),
+            React.createElement(
+              "div",
+              { className: "dshLanFields" },
+              React.createElement(
+                "label",
+                null,
+                React.createElement("span", null, t("lanBindAddress")),
+                React.createElement(
+                  "select",
+                  {
+                    value: config.bindAddress,
+                    disabled: busy || !view.writable,
+                    onChange: (event) => update({ bindAddress: event.target.value })
+                  },
+                  ...bindOptions.map((item, index) => React.createElement("option", { key: `${index}:${item.address}`, value: item.address, disabled: item.disabled }, item.label))
+                )
+              ),
+              field(t("lanPort"), String(config.port), (value) => update({ port: Number(value) }), "number")
+            ),
+            React.createElement("p", null, t("lanAddressSelectionHint")),
+            field(t("lanAccessToken"), config.accessToken, (value) => update({ accessToken: value }), listenerTokenVisible ? "text" : "password"),
+            React.createElement(
+              "div",
+              { className: "dshLanActions" },
+              React.createElement("button", { type: "button", "aria-pressed": listenerTokenVisible, onClick: () => setListenerTokenVisible((current) => !current) }, t(listenerTokenVisible ? "lanHideToken" : "lanShowToken"))
+            ),
+            React.createElement("p", null, t("lanListenerTokenHint")),
+            React.createElement("button", { type: "button", disabled: busy || !view.writable, onClick: () => {
+              if (!validPort(String(config.port))) {
+                setError(t("lanInvalidPort"));
+                return;
+              }
+              if (config.accessToken !== "" && config.accessToken.trim().length < 16) {
+                setError(t("lanTokenTooShort"));
+                return;
+              }
+              save({ enabled: config.enabled, bindAddress: config.bindAddress.trim(), port: config.port, accessToken: config.accessToken });
+            } }, t("lanSaveListener"))
+          )
+        ),
+        view.writable ? null : React.createElement("p", null, t("readOnly")),
+        React.createElement("p", { className: error === void 0 ? "dshRemoteNotice" : "dshRemoteError", role: error === void 0 ? "status" : "alert", "aria-live": "polite" }, error ?? (notice ? t("lanSaved") : ""))
+      );
+    };
   }
 
   // src/client/shell.ts
@@ -2977,7 +1339,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
     return style.dataset.plugin = clientModuleId2, style.dataset.pluginCss = "dsh-remote", style.textContent = [
       // Browser navigation still targets the Desktop machine until Harness exposes
       // a Remote URL resolver. Hide the native guide entry in Remote mode only.
-      'html.dshRemoteBrowserUnavailable [data-sidebar-right-guide-entry="browser"]{display:none!important}',
+      'html.dshLanBrowserUnavailable [data-sidebar-right-guide-entry="browser"]{display:none!important}',
       'html.dshRemoteTargetActive button[aria-label="\u6DFB\u52A0\u5DE5\u4F5C\u533A"],html.dshRemoteTargetActive button[aria-label="Add workspace"]{display:none!important}',
       'html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="\u6307\u4EE4"],html.dshRemoteCodexTargetActive [data-composer-card] button[aria-haspopup="listbox"][aria-label="Commands"]{display:none!important}',
       "[data-dsh-remote-hidden-action]{display:none!important}",
@@ -3090,15 +1452,86 @@ Minimum version required to store current data is: ` + bestVersion + `.
     };
   }
 
-  // src/client/workspaces.ts
-  var import_qrcode = __toESM(require_browser(), 1);
-
   // src/client/icons.ts
   var deepSeekWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAACVBMVEUAAADy8vXx8fUsA3vyAAAAAXRSTlMAQObYZgAAAOxJREFUWMPtlsEOwyAMQxP+/6OnTZMGxHGcot3wDYgfhkJbs6urprzveGtu9d1NgEdto8w93GuA7zPS2RFg7ynsCOAokbtAmLr2YaeKgJ6fxpT8jCAC0qSqPyNoO5DXdvyouj4ClFAdYaDxK09uiBDCIYBf6CxLesnR0uF2pG+JmhCqrUb0AOvjjoQaYDTCEAAgMg5grhAeAQIB+/M15IcKlnUIp4CkTCd0AKb4zVsRSJVGYEVzT0agK107IMGMEurvromEpaX4wzk/IKw378kq4LafED6Oowxfk7AP2q8W16EdM3p29Eyvrv6vF0WIBfBziKyCAAAAAElFTkSuQmCC", gptWorkspaceIcon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAclBMVEX////v7+++wMf////s7O3k5OTExcrX2Ny6vMTv8PPW19yXmqRqboJmaHd3eoaqrLPs7fGMjpfb3eKlpq1eYXOxs7pWWWd+gY5HSVdRVGVub3k+QU74+Pg4OkcvMT1ISlUoKjUiIy4fICueoKkaGyUSFB21Bp+qAAAAAXRSTlMAQObYZgAABChJREFUWMPtl916qjoQhlsdEwIECEgMYCBxx/u/xT1DrFUL1LO1DtY8LSLJvPnmB4gfH//sr7TPDfvdebf/xXZbkE/4zZ0MVhGHd9zJDsv+7F3//Z69tT5wljAu3tXw+TIlzXKJlhflYmJ+5uF5WpWhb54X+C/zZCmT2wJA4dJZwus0UYjIGqWyMhVbEp4yKNRRqlv0opW5PJLJ4rFJXvP4JKDRMqturBZjkMVJFYjR6iHQDQDI4+k2k51wZbWrqwp4mR/1CVYATyko9TFGxBUqL5IvMbXSWt0T8bkGgFLqgqZBI/Uxbx5UAxLaNcCNLBpttM7wbCc1pmJOpWAsDtey68UaQMyrFgb9uxLPjqg3+nGluyKN0XUdWw0BJ0NvTFFqgzpr9J+Dh4w0Ga1qkqBNswagxdRgFPAbgHRQG5jumGWyMxrTIaRRa4AzFs0YrNMXgI4MJWnsKYFhGNMnIh/mBOPsV8CZBFjN9w8ArowxnZzDr5IcvxTaKpxJCVsoI3SWysz1UM4AqQdzlCgho1IKrK+x1mKFzisANtgEU8E7GwHDgOqxe4w9tnM166wbaA2xBMBLrTWcAGYGdCiYVUJUrMCF+7l6gklrW1RwPi8ByjuActANqhKzVWoYrFGcCFzbDgNaBrTWpncFQMcI2DfWoAiDqRCiHcYM/ZdCEKkZqfR8spj4F0CiJjv2gHL6URNoCQDaYacL6O1oFDO2eQDUFP7AKdCRdC4CRDZaNifbjA41l/uYb/SZMAFNTBGzY7sG4J2jTsJgToOzIzXF3HZqBpSOAGduXbkGEKV1OqVGqRJpRxtvwbSw5IqAiUJItwBCOT9R32FCGo3nCkAN3t0UTBRC6zDONcBeOee9pr4T+ASbnDOdc5OmtREwEEB5w8Wqgt4bOV5c7Lt9iiK8zdP/IsBbutUGX4gNwEVCqd3FUt/xYnRWt7BvPBYQjwjAGXa3ASguHVAZ/WXKlA3eZDX1wRegFsr7E2wAlB9xFbx/7MV70kFT8aqNgLL3F8nFBmA3hrn/IJHjKJOK2oj1WI4Z4FzwN/81AOhgYD6v2xbIvaZIurLC9AfvB1WLTYAoXejF1xeBL5cpBIyEbmxkZymIXwDQh1BAfOrhI1lfwtgz8tozF5T4ttf3+32AyxC6klwAgw/YVTHpoK82xYt3wLP/Bw4AAI4D7/01TLKXBj9NEz2wEuGiKpoy68S/FwCLMQAZ3gXhihaCa25vQo6RyToOz9PE6wYjJgGi1YnqZX8qMIK+TDlnargGzSv4NvFjlwXf/nfLLMrAB4O/Xl3BH0d+RIASFgDA8IYMIXgr2+cBsbDdPSwAAHjSZFmb3txETCKIxc0uWwI8rxsLJcTiVndNwyMgKljbbNN2/zcEAja2+4RgIDYN2Bu/WtAOaEodnu2dnzz/7I/Y/w/LaEcX/MdfAAAAAElFTkSuQmCC";
 
+  // src/client/progress.ts
+  function createRemoteProgressView(React) {
+    function RemoteProgressView(props) {
+      let progress = props.progress;
+      if (progress === void 0) return null;
+      let percent = Math.max(0, Math.min(100, Math.round(progress.percent))), activeTransports = new Set(progress.activeTransports ?? []), detail = progress.transports !== void 0 && activeTransports.size > 0 ? React.createElement(
+        "span",
+        { className: "dshRemoteProgressRoute" },
+        props.t(progress.routeVerb === "using" ? "remoteProgressUsingPrefix" : "remoteProgressTryingPrefix"),
+        progress.transports.map((transport, index) => React.createElement(
+          React.Fragment,
+          { key: `${transport}:${index}` },
+          index === 0 ? null : React.createElement("span", { className: "dshRemoteProgressRouteArrow", "aria-hidden": !0 }, " -> "),
+          React.createElement("span", {
+            className: activeTransports.has(transport) ? "isActive" : void 0
+          }, transportDiagnosticLabel(transport))
+        ))
+      ) : props.t(progress.detail);
+      return React.createElement(
+        "div",
+        {
+          className: "dshRemoteProgress",
+          role: "status",
+          "aria-live": "polite"
+        },
+        React.createElement(
+          "div",
+          { className: "dshRemoteProgressHeader" },
+          React.createElement("strong", null, props.t(progress.label)),
+          React.createElement("span", null, `${percent}%`)
+        ),
+        React.createElement("p", null, detail),
+        React.createElement("div", {
+          className: "dshRemoteProgressBar",
+          role: "progressbar",
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": percent,
+          "aria-label": props.t(progress.label)
+        }, React.createElement("span", { style: { transform: `scaleX(${percent / 100})` } }))
+      );
+    }
+    return RemoteProgressView;
+  }
+  async function runConnectHostProgress(preferredTransports, targetDeviceId, control, connectedStep, setProgress, progressRun, action, readyProgress) {
+    let runId = progressRun.current + 1;
+    progressRun.current = runId;
+    let polling = !0, pollTimer, connectedAt, apply = (next) => {
+      progressRun.current === runId && setProgress(next);
+    }, poll = async () => {
+      try {
+        let status = await control("status");
+        if (!polling || progressRun.current !== runId) return;
+        (status.connectionProgress?.phase === "connected" || status.connectedTargetDeviceId === targetDeviceId) && connectedAt === void 0 && (connectedAt = Date.now());
+        let next = observedConnectionProgress(status, targetDeviceId, preferredTransports, connectedStep, connectedAt);
+        next !== void 0 && apply(next);
+      } catch {
+      } finally {
+        polling && progressRun.current === runId && (pollTimer = window.setTimeout(() => {
+          poll();
+        }, 300));
+      }
+    };
+    apply({ label: "remoteProgressCheckingHost", detail: "remoteProgressCheckingHostDetail", percent: 12 });
+    let pending = action();
+    poll();
+    try {
+      let result = await pending;
+      return polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), apply(readyProgress?.(result) ?? { label: "remoteProgressReady", detail: "remoteProgressReadyDetail", percent: 100 }), await new Promise((resolve) => window.setTimeout(resolve, 520)), result;
+    } finally {
+      polling = !1, pollTimer !== void 0 && window.clearTimeout(pollTimer), progressRun.current === runId && setProgress(void 0);
+    }
+  }
+
   // src/client/workspaces.ts
   function createRemoteWorkspaceAction(React) {
-    let RemoteProgressView = createRemoteProgressView(React);
+    let RemoteProgressView = createRemoteProgressView(React), LanSettingsPanel = createLanSettingsPanel(React);
     function RemoteWorkspaceAction(props) {
       let { t } = props, connectionErrorMessageFor = (reason, translate) => {
         if (typeof reason == "object" && reason !== null && "code" in reason) {
@@ -3106,9 +1539,9 @@ Minimum version required to store current data is: ` + bestVersion + `.
           if (typeof code == "string") return connectionErrorMessage(code, translate);
         }
         return messageOf(reason);
-      }, [open, setOpen] = React.useState(!1), [status, setStatus] = React.useState(void 0), [devices, setDevices] = React.useState([]), [selectedHost, setSelectedHost] = React.useState(void 0), [connectingHost, setConnectingHost] = React.useState(void 0), [workspaces, setWorkspaces] = React.useState([]), [codexWorkspaces, setCodexWorkspaces] = React.useState([]), [cursorWorkspaces, setCursorWorkspaces] = React.useState([]), [antigravityWorkspaces, setAntigravityWorkspaces] = React.useState([]), [piWorkspaces, setPiWorkspaces] = React.useState([]), [opencodeWorkspaces, setOpencodeWorkspaces] = React.useState([]), [claudeWorkspaces, setClaudeWorkspaces] = React.useState([]), [workspaceBackend, setWorkspaceBackend] = React.useState("harness"), [codexWorkspaceId, setCodexWorkspaceId] = React.useState(void 0), [cursorWorkspaceId, setCursorWorkspaceId] = React.useState(void 0), [antigravityWorkspaceId, setAntigravityWorkspaceId] = React.useState(void 0), [piWorkspaceId, setPiWorkspaceId] = React.useState(void 0), [opencodeWorkspaceId, setOpencodeWorkspaceId] = React.useState(void 0), [claudeWorkspaceId, setClaudeWorkspaceId] = React.useState(void 0), [directory, setDirectory] = React.useState(void 0), [path, setPath] = React.useState(""), [addingWorkspace, setAddingWorkspace] = React.useState(!1), [showAllWorkspaces, setShowAllWorkspaces] = React.useState(!1), [showAllCodexWorkspaces, setShowAllCodexWorkspaces] = React.useState(!1), [devicesOpen, setDevicesOpen] = React.useState(!1), [showAllCursorWorkspaces, setShowAllCursorWorkspaces] = React.useState(!1), [showAllAntigravityWorkspaces, setShowAllAntigravityWorkspaces] = React.useState(!1), [showAllPiWorkspaces, setShowAllPiWorkspaces] = React.useState(!1), [showAllOpencodeWorkspaces, setShowAllOpencodeWorkspaces] = React.useState(!1), [showAllClaudeWorkspaces, setShowAllClaudeWorkspaces] = React.useState(!1), workspaceListId = "dsh-remote-workspace-list", codexWorkspaceHeadingId = "dsh-remote-codex-workspace-heading", codexWorkspaceListId = "dsh-remote-codex-workspace-list", cursorWorkspaceHeadingId = "dsh-remote-cursor-workspace-heading", cursorWorkspaceListId = "dsh-remote-cursor-workspace-list", antigravityWorkspaceHeadingId = "dsh-remote-antigravity-workspace-heading", piWorkspaceHeadingId = "dsh-remote-pi-workspace-heading", opencodeWorkspaceHeadingId = "dsh-remote-opencode-workspace-heading", claudeWorkspaceHeadingId = "dsh-remote-claude-workspace-heading", antigravityWorkspaceListId = "dsh-remote-antigravity-workspace-list", piWorkspaceListId = "dsh-remote-pi-workspace-list", opencodeWorkspaceListId = "dsh-remote-opencode-workspace-list", claudeWorkspaceListId = "dsh-remote-claude-workspace-list", [busy, setBusy] = React.useState(!1), [needsAuthorization, setNeedsAuthorization] = React.useState(void 0), [email, setEmail] = React.useState(""), [password, setPassword] = React.useState(""), [loginServerUrl, setLoginServerUrl] = React.useState("https://dsh.r2049.cn"), [editingServer, setEditingServer] = React.useState(!1), [savingServer, setSavingServer] = React.useState(!1), serverDirty = loginServerUrl.trim() !== (status?.serverUrl ?? ""), [loginMethod, setLoginMethod] = React.useState("password"), loginMethodManuallySelected = React.useRef(!1), [oauthProviders, setOAuthProviders] = React.useState([]), [providersLoading, setProvidersLoading] = React.useState(!1), [providersFailed, setProvidersFailed] = React.useState(!1), [providerReload, setProviderReload] = React.useState(0), providerRequestRun = React.useRef(0), [qrSession, setQrSession] = React.useState(void 0), [qrImage, setQrImage] = React.useState(void 0), [qrExpired, setQrExpired] = React.useState(!1), [hostEmail, setHostEmail] = React.useState(""), [hostPassword, setHostPassword] = React.useState(""), [hostRegistrationCode, setHostRegistrationCode] = React.useState(""), [progress, setProgress] = React.useState(void 0), progressRun = React.useRef(0), qrFlowRun = React.useRef(0), pageRef = React.useRef(null), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0);
+      }, [open, setOpen] = React.useState(!1), [status, setStatus] = React.useState(void 0), [devices, setDevices] = React.useState([]), [selectedHost, setSelectedHost] = React.useState(void 0), [connectingHost, setConnectingHost] = React.useState(void 0), [workspaces, setWorkspaces] = React.useState([]), [codexWorkspaces, setCodexWorkspaces] = React.useState([]), [cursorWorkspaces, setCursorWorkspaces] = React.useState([]), [antigravityWorkspaces, setAntigravityWorkspaces] = React.useState([]), [piWorkspaces, setPiWorkspaces] = React.useState([]), [opencodeWorkspaces, setOpencodeWorkspaces] = React.useState([]), [claudeWorkspaces, setClaudeWorkspaces] = React.useState([]), [workspaceBackend, setWorkspaceBackend] = React.useState("harness"), [codexWorkspaceId, setCodexWorkspaceId] = React.useState(void 0), [cursorWorkspaceId, setCursorWorkspaceId] = React.useState(void 0), [antigravityWorkspaceId, setAntigravityWorkspaceId] = React.useState(void 0), [piWorkspaceId, setPiWorkspaceId] = React.useState(void 0), [opencodeWorkspaceId, setOpencodeWorkspaceId] = React.useState(void 0), [claudeWorkspaceId, setClaudeWorkspaceId] = React.useState(void 0), [directory, setDirectory] = React.useState(void 0), [path, setPath] = React.useState(""), [addingWorkspace, setAddingWorkspace] = React.useState(!1), [showAllWorkspaces, setShowAllWorkspaces] = React.useState(!1), [showAllCodexWorkspaces, setShowAllCodexWorkspaces] = React.useState(!1), [devicesOpen, setDevicesOpen] = React.useState(!1), [showAllCursorWorkspaces, setShowAllCursorWorkspaces] = React.useState(!1), [showAllAntigravityWorkspaces, setShowAllAntigravityWorkspaces] = React.useState(!1), [showAllPiWorkspaces, setShowAllPiWorkspaces] = React.useState(!1), [showAllOpencodeWorkspaces, setShowAllOpencodeWorkspaces] = React.useState(!1), [showAllClaudeWorkspaces, setShowAllClaudeWorkspaces] = React.useState(!1), workspaceListId = "dsh-remote-workspace-list", codexWorkspaceHeadingId = "dsh-remote-codex-workspace-heading", codexWorkspaceListId = "dsh-remote-codex-workspace-list", cursorWorkspaceHeadingId = "dsh-remote-cursor-workspace-heading", cursorWorkspaceListId = "dsh-remote-cursor-workspace-list", antigravityWorkspaceHeadingId = "dsh-remote-antigravity-workspace-heading", piWorkspaceHeadingId = "dsh-remote-pi-workspace-heading", opencodeWorkspaceHeadingId = "dsh-remote-opencode-workspace-heading", claudeWorkspaceHeadingId = "dsh-remote-claude-workspace-heading", antigravityWorkspaceListId = "dsh-remote-antigravity-workspace-list", piWorkspaceListId = "dsh-remote-pi-workspace-list", opencodeWorkspaceListId = "dsh-remote-opencode-workspace-list", claudeWorkspaceListId = "dsh-remote-claude-workspace-list", [busy, setBusy] = React.useState(!1), [progress, setProgress] = React.useState(void 0), progressRun = React.useRef(0), pageRef = React.useRef(null), [notice, setNotice] = React.useState(void 0), [error, setError] = React.useState(void 0);
       React.useEffect(() => {
-        open || (setDevicesOpen(!1), qrFlowRun.current += 1, setBusy(!1));
+        open || (setDevicesOpen(!1), setBusy(!1));
       }, [open]), React.useEffect(() => {
         if (!open) return;
         let frame = window.requestAnimationFrame(() => pageRef.current?.focus());
@@ -3138,92 +1571,12 @@ Minimum version required to store current data is: ` + bestVersion + `.
         props.control("status").then(setStatus).catch(() => {
         });
       }, []), React.useEffect(() => {
-        status?.serverUrl !== void 0 && setLoginServerUrl(status.serverUrl);
-      }, [status?.serverUrl]), React.useEffect(() => {
         let remoteActive = status?.mode === "remote";
         return document.documentElement.classList.toggle("dshRemoteTargetActive", remoteActive), () => {
           remoteActive && document.documentElement.classList.remove("dshRemoteTargetActive");
         };
       }, [status?.mode]);
-      let startQrLogin = async (provider) => {
-        let run = ++qrFlowRun.current;
-        setBusy(!0), setError(void 0), setQrExpired(!1);
-        try {
-          let session = await props.control("client.account.qr.start", { provider }), image = await import_qrcode.default.toDataURL(session.scanUrl, {
-            width: 184,
-            margin: 1,
-            errorCorrectionLevel: "L"
-          });
-          if (run !== qrFlowRun.current) return;
-          setQrSession(session), setQrImage(image);
-        } catch (reason) {
-          run === qrFlowRun.current && setError(messageOf(reason));
-        } finally {
-          run === qrFlowRun.current && setBusy(!1);
-        }
-      };
-      React.useEffect(() => {
-        if (!open || !needsAuthorization || savingServer || serverDirty) return;
-        let active = !0, run = ++providerRequestRun.current;
-        return qrFlowRun.current += 1, setBusy(!1), setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setOAuthProviders([]), setProvidersLoading(!0), setProvidersFailed(!1), props.control("client.account.providers").then((items) => {
-          if (!active || run !== providerRequestRun.current) return;
-          let available = items.filter((item) => item.qrStartUrl != null);
-          setOAuthProviders(available), setLoginMethod((current) => {
-            if (loginMethodManuallySelected.current && (current === "password" || available.some((item) => `oauth:${item.id}` === current))) return current;
-            let preferred = available.find((item) => item.id === props.preferredQrProvider) ?? available[0];
-            return preferred === void 0 ? "password" : `oauth:${preferred.id}`;
-          });
-        }).catch((reason) => {
-          !active || run !== providerRequestRun.current || (setProvidersFailed(!0), setLoginMethod("password"), setError(messageOf(reason)));
-        }).finally(() => {
-          active && run === providerRequestRun.current && setProvidersLoading(!1);
-        }), () => {
-          active = !1;
-        };
-      }, [open, needsAuthorization, status?.serverUrl, props.preferredQrProvider, providerReload, savingServer, serverDirty]), React.useEffect(() => {
-        !open || !needsAuthorization || savingServer || serverDirty || providersLoading || loginMethod === "password" || !oauthProviders.some((item) => `oauth:${item.id}` === loginMethod) || qrSession !== void 0 || qrExpired || startQrLogin(loginMethod.slice(6));
-      }, [open, needsAuthorization, providersLoading, oauthProviders, loginMethod, qrSession, qrExpired, savingServer, serverDirty]), React.useEffect(() => {
-        if (!open || savingServer || serverDirty || loginMethod === "password" || qrSession === void 0) return;
-        let active = !0, polling = !1, settled = !1, run = qrFlowRun.current, timer, poll = () => {
-          polling || settled || (polling = !0, props.control("client.account.qr.poll", { qrId: qrSession.qrId }).then(async (result) => {
-            if (!(!active || settled || run !== qrFlowRun.current))
-              if (result.status === "complete") {
-                settled = !0, timer !== void 0 && window.clearInterval(timer), setBusy(!0), setError(void 0), setQrExpired(!1);
-                try {
-                  let [nextDevices, nextStatus] = await Promise.all([
-                    props.control("devices"),
-                    props.control("status")
-                  ]);
-                  active && run === qrFlowRun.current && (setDevices(nextDevices), setStatus(nextStatus), setNeedsAuthorization(!1));
-                } catch (reason) {
-                  active && run === qrFlowRun.current && setError(connectionErrorMessageFor(reason, t));
-                } finally {
-                  run === qrFlowRun.current && (setQrSession(void 0), setQrImage(void 0), setBusy(!1));
-                }
-              } else result.status === "expired" && (settled = !0, timer !== void 0 && window.clearInterval(timer), setQrExpired(!0), setQrSession(void 0), setQrImage(void 0));
-          }).catch((reason) => {
-            active && !settled && run === qrFlowRun.current && setError(messageOf(reason));
-          }).finally(() => {
-            polling = !1;
-          }));
-        };
-        return poll(), timer = window.setInterval(poll, 1500), () => {
-          active = !1, timer !== void 0 && window.clearInterval(timer);
-        };
-      }, [open, loginMethod, qrSession, savingServer, serverDirty]);
-      let selectLoginMethod = (method) => {
-        loginMethodManuallySelected.current = !0, method !== loginMethod && (qrFlowRun.current += 1, setLoginMethod(method), setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setError(void 0));
-      }, orderedQrProviders = [...oauthProviders].sort((a, b) => +(b.id === props.preferredQrProvider) - +(a.id === props.preferredQrProvider)), selectedProvider = oauthProviders.find((item) => `oauth:${item.id}` === loginMethod), scanLabel = t("scanWithProvider", { provider: selectedProvider?.displayName ?? "" }), qrLoginTab = (provider) => React.createElement("button", {
-        key: provider.id,
-        type: "button",
-        role: "tab",
-        id: `dsh-remote-oauth:${provider.id}-tab`,
-        "aria-selected": loginMethod === `oauth:${provider.id}`,
-        "aria-controls": `dsh-remote-oauth:${provider.id}-panel`,
-        className: loginMethod === `oauth:${provider.id}` ? "isActive" : "",
-        disabled: busy,
-        onClick: () => selectLoginMethod(`oauth:${provider.id}`)
-      }, t("providerLogin", { provider: provider.displayName })), selectHost = async (host) => {
+      let selectHost = async (host) => {
         setBusy(!0), setError(void 0), setConnectingHost(host), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1);
         try {
           let result = await runConnectHostProgress(
@@ -3293,18 +1646,16 @@ Minimum version required to store current data is: ` + bestVersion + `.
         try {
           let nextStatus = await props.control("status");
           if (setStatus(nextStatus), nextStatus.controlUnavailable) {
-            setNeedsAuthorization(void 0), setError(t("remoteControlUnavailable"));
+            setError(t("remoteControlUnavailable"));
             return;
           }
           if (!nextStatus.available) {
-            setDevices([]), setNeedsAuthorization(!1), setSelectedHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1), setWorkspaceBackend("harness"), setCodexWorkspaceId(void 0), setCursorWorkspaceId(void 0), setAntigravityWorkspaceId(void 0), setPiWorkspaceId(void 0), setOpencodeWorkspaceId(void 0), setClaudeWorkspaceId(void 0), setPath(""), setAddingWorkspace(!1), setDirectory(void 0);
+            setDevices([]), setSelectedHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1), setWorkspaceBackend("harness"), setCodexWorkspaceId(void 0), setCursorWorkspaceId(void 0), setAntigravityWorkspaceId(void 0), setPiWorkspaceId(void 0), setOpencodeWorkspaceId(void 0), setClaudeWorkspaceId(void 0), setPath(""), setAddingWorkspace(!1), setDirectory(void 0);
             return;
           }
           try {
-            if (!(await props.control("client.authorization.status")).hasCredentials)
-              throw Object.assign(new Error("Remote account authorization is required."), { code: "ACCOUNT_AUTH_REQUIRED" });
             let nextDevices = await props.control("devices");
-            if (setDevices(nextDevices), setNeedsAuthorization(!1), selectedHost !== void 0) {
+            if (setDevices(nextDevices), selectedHost !== void 0) {
               let nextSelectedHost = nextDevices.find((device) => device.deviceId === selectedHost.deviceId);
               nextSelectedHost === void 0 ? (setSelectedHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1), setWorkspaceBackend("harness"), setCodexWorkspaceId(void 0), setCursorWorkspaceId(void 0), setAntigravityWorkspaceId(void 0), setPiWorkspaceId(void 0), setOpencodeWorkspaceId(void 0), setClaudeWorkspaceId(void 0), setPath(""), setAddingWorkspace(!1), setDirectory(void 0)) : (setSelectedHost(nextSelectedHost), props.control("workspaces.list", { targetDeviceId: nextSelectedHost.deviceId }).then((w) => setWorkspaces(w)).catch(() => {
               }), props.control("codex.workspaces.list", { targetDeviceId: nextSelectedHost.deviceId }).then((w) => setCodexWorkspaces(w)).catch(() => {
@@ -3316,8 +1667,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
               }));
             }
           } catch (reason) {
-            let code = typeof reason == "object" && reason !== null && "code" in reason ? String(reason.code) : "";
-            ["ACCOUNT_AUTH_REQUIRED", "AUTH_INVALID", "AUTH_REQUIRED", "TOKEN_EXPIRED", "DEVICE_REVOKED", "DEVICE_OWNERSHIP_REQUIRED"].includes(code) ? (setDevices([]), setNeedsAuthorization(!0), setSelectedHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1), setWorkspaceBackend("harness"), setCodexWorkspaceId(void 0), setCursorWorkspaceId(void 0), setAntigravityWorkspaceId(void 0), setPiWorkspaceId(void 0), setOpencodeWorkspaceId(void 0), setClaudeWorkspaceId(void 0), setPath(""), setAddingWorkspace(!1), setDirectory(void 0)) : setError(messageOf(reason));
+            setError(connectionErrorMessageFor(reason, t));
           }
         } catch (reason) {
           setError(connectionErrorMessageFor(reason, t));
@@ -3335,75 +1685,12 @@ Minimum version required to store current data is: ` + bestVersion + `.
       }, [open, selectedHost]);
       let chooseAnotherHost = () => {
         setSelectedHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setShowAllWorkspaces(!1), setShowAllCodexWorkspaces(!1), setShowAllCursorWorkspaces(!1), setShowAllAntigravityWorkspaces(!1), setShowAllPiWorkspaces(!1), setShowAllOpencodeWorkspaces(!1), setShowAllClaudeWorkspaces(!1), setWorkspaceBackend("harness"), setCodexWorkspaceId(void 0), setCursorWorkspaceId(void 0), setAntigravityWorkspaceId(void 0), setPiWorkspaceId(void 0), setOpencodeWorkspaceId(void 0), setClaudeWorkspaceId(void 0), setDirectory(void 0), setPath(""), setAddingWorkspace(!1), setError(void 0);
-      }, resetLoginFlow = () => {
-        providerRequestRun.current += 1, qrFlowRun.current += 1, setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setOAuthProviders([]), setProvidersFailed(!1), setProvidersLoading(!1), setLoginMethod("password"), loginMethodManuallySelected.current = !1, setPassword(""), setError(void 0), setNotice(void 0);
-      }, saveLoginServer = async () => {
-        if (!(loginServerUrl.trim() === "" || savingServer)) {
-          resetLoginFlow(), setSavingServer(!0), setBusy(!0);
-          try {
-            if ((await props.control("settings.server.set", { serverUrl: loginServerUrl.trim() })).applies !== "live") {
-              setNotice(t("serverSaved"));
-              return;
-            }
-            let nextStatus = await props.control("status");
-            setStatus(nextStatus), setLoginServerUrl(nextStatus.serverUrl ?? loginServerUrl.trim()), setEditingServer(!1), setProviderReload((value) => value + 1);
-          } catch (reason) {
-            setError(messageOf(reason));
-          } finally {
-            setSavingServer(!1), setBusy(!1);
-          }
-        }
-      }, signInClient = async () => {
-        if (!(serverDirty || savingServer || email.trim() === "" || password === "" || loginServerUrl.trim() === "")) {
-          setBusy(!0), setError(void 0);
-          try {
-            await props.control("settings.configure", {
-              role: "client",
-              serverUrl: loginServerUrl.trim(),
-              email: email.trim(),
-              password
-            }), setDevices(await props.control("devices")), setStatus(await props.control("status")), setNeedsAuthorization(!1), setPassword("");
-          } catch (reason) {
-            setError(connectionErrorMessageFor(reason, t));
-          } finally {
-            setBusy(!1);
-          }
-        }
-      }, authorizeHost = async (kind) => {
-        if (!(kind === "account" && (hostEmail.trim() === "" || hostPassword === "")) && !(kind === "code" && hostRegistrationCode.trim() === "")) {
-          setBusy(!0), setError(void 0);
-          try {
-            kind === "account" ? (await props.control("host.account.login", { email: hostEmail.trim(), password: hostPassword }), setHostPassword("")) : (await props.control("host.registration-code.submit", { code: hostRegistrationCode.trim() }), setHostRegistrationCode("")), setStatus(await props.control("status"));
-          } catch (reason) {
-            setError(connectionErrorMessageFor(reason, t));
-          } finally {
-            setBusy(!1);
-          }
-        }
       }, openLocalWorkspaces = async () => {
         setBusy(!0), setError(void 0);
         try {
           await props.control("mode.set", { mode: "local" }), window.location.reload();
         } catch (reason) {
           setError(messageOf(reason)), setBusy(!1);
-        }
-      }, setCurrentDeviceControl = async (enabled) => {
-        setBusy(!0), setError(void 0);
-        try {
-          setStatus(await props.control("host.authorization.set", { enabled }));
-        } catch (reason) {
-          setError(messageOf(reason));
-        } finally {
-          setBusy(!1);
-        }
-      }, logoutRemote = async () => {
-        qrFlowRun.current += 1, progressRun.current += 1, setBusy(!0), setError(void 0);
-        try {
-          await props.control("settings.logout"), setDevices([]), setSelectedHost(void 0), setConnectingHost(void 0), setWorkspaces([]), setCodexWorkspaces([]), setCursorWorkspaces([]), setAntigravityWorkspaces([]), setPiWorkspaces([]), setOpencodeWorkspaces([]), setClaudeWorkspaces([]), setDirectory(void 0), setPath(""), setPassword(""), setProgress(void 0), setNeedsAuthorization(!0), setQrSession(void 0), setQrImage(void 0), setQrExpired(!1), setStatus(await props.control("status"));
-        } catch (reason) {
-          setError(messageOf(reason));
-        } finally {
-          setBusy(!1);
         }
       }, openWorkspace = async (selection) => {
         let targetBackend = selection?.backend ?? workspaceBackend, targetPath = (selection?.path ?? path).trim(), targetCodexWorkspaceId = selection?.backend === "codex" ? selection.workspaceId : selection === void 0 ? codexWorkspaceId : void 0, targetCursorWorkspaceId = selection?.backend === "cursor" ? selection.workspaceId : selection === void 0 ? cursorWorkspaceId : void 0, targetAntigravityWorkspaceId = selection?.backend === "antigravity" ? selection.workspaceId : selection === void 0 ? antigravityWorkspaceId : void 0, targetPiWorkspaceId = selection?.backend === "pi" ? selection.workspaceId : selection === void 0 ? piWorkspaceId : void 0, targetOpencodeWorkspaceId = selection?.backend === "opencode" ? selection.workspaceId : selection === void 0 ? opencodeWorkspaceId : void 0, targetClaudeWorkspaceId = selection?.backend === "claude" ? selection.workspaceId : selection === void 0 ? claudeWorkspaceId : void 0, createWorkspace = selection === void 0 && addingWorkspace;
@@ -3438,7 +1725,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
         formatPlatform(selectedHost.platform),
         selectedHost.harnessVersion === void 0 ? void 0 : t("harnessVersion", { version: selectedHost.harnessVersion }),
         selectedHost.clientVersion === void 0 ? void 0 : t("pluginVersion", { version: selectedHost.clientVersion })
-      ].filter(Boolean).join(" \xB7 "), connectedClients = status?.host?.connectedClients ?? [], connectedCount = connectedClients.length, connectedCountLabel = t("connectedClientCount", { count: connectedCount }), connectedMenu = !needsAuthorization && status?.hostAuthorizationAvailable === !0 ? React.createElement(
+      ].filter(Boolean).join(" \xB7 "), connectedClients = status?.host?.connectedClients ?? [], connectedCount = connectedClients.length, connectedCountLabel = t("connectedClientCount", { count: connectedCount }), connectedMenu = status?.hostAuthorizationAvailable === !0 ? React.createElement(
         "div",
         {
           className: `dshRemoteConnectedMenu${devicesOpen ? " isOpen" : ""}`
@@ -3591,198 +1878,23 @@ Minimum version required to store current data is: ` + bestVersion + `.
             React.createElement(
               React.Fragment,
               null,
-              needsAuthorization === void 0 && busy ? React.createElement("p", null, t("checkingConnection")) : null,
-              needsAuthorization ? React.createElement(
-                "section",
-                { className: "dshRemoteEnable" },
-                React.createElement(
-                  "div",
-                  { className: "dshRemoteLoginHeading" },
-                  React.createElement(
-                    "a",
-                    {
-                      href: "https://github.com/liguobao/ds-harness-remote",
-                      target: "_blank",
-                      rel: "noopener noreferrer"
-                    },
-                    React.createElement("strong", { className: "dshRemoteLoginTitle" }, t("signInClient")),
-                    React.createElement("span", null, t("signInClientDescription"))
-                  )
-                ),
-                React.createElement(
-                  "div",
-                  { className: "dshRemoteLoginTabs", role: "tablist" },
-                  ...orderedQrProviders.map(qrLoginTab),
-                  React.createElement("button", {
-                    type: "button",
-                    role: "tab",
-                    id: "dsh-remote-password-tab",
-                    "aria-selected": loginMethod === "password",
-                    "aria-controls": "dsh-remote-password-panel",
-                    className: loginMethod === "password" ? "isActive" : "",
-                    disabled: busy || savingServer || serverDirty,
-                    onClick: () => selectLoginMethod("password")
-                  }, t("accountPasswordLogin"))
-                ),
-                providersLoading ? React.createElement("p", { role: "status" }, t("loadingLoginProviders")) : null,
-                providersFailed ? React.createElement("button", {
-                  type: "button",
-                  disabled: busy || savingServer || serverDirty,
-                  onClick: () => {
-                    setError(void 0), setProviderReload((value) => value + 1);
-                  }
-                }, t("retryLoginProviders")) : null,
-                !savingServer && !serverDirty && !providersLoading && !providersFailed && oauthProviders.length === 0 ? React.createElement("p", { role: "status" }, t("noLoginProviders")) : null,
-                loginMethod !== "password" && selectedProvider !== void 0 ? React.createElement(
-                  "div",
-                  {
-                    className: "dshRemoteQrLogin",
-                    role: "tabpanel",
-                    id: `dsh-remote-${loginMethod}-panel`,
-                    "aria-labelledby": `dsh-remote-${loginMethod}-tab`
-                  },
-                  qrImage === void 0 ? React.createElement(
-                    "div",
-                    { className: "dshRemoteQrPlaceholder", "aria-busy": busy },
-                    qrExpired ? React.createElement("p", null, t("qrLoginExpired")) : React.createElement("span", null, t("checkingConnection"))
-                  ) : qrSession !== void 0 ? React.createElement(
-                    "a",
-                    {
-                      className: "dshRemoteQrOpen",
-                      href: qrSession.scanUrl,
-                      target: "_blank",
-                      rel: "noopener noreferrer",
-                      "aria-label": t("openInBrowser")
-                    },
-                    React.createElement("img", {
-                      src: qrImage,
-                      width: 184,
-                      height: 184,
-                      alt: scanLabel
-                    }),
-                    React.createElement("span", null, t("openInBrowser"), " \u2197")
-                  ) : null,
-                  React.createElement("strong", null, scanLabel),
-                  React.createElement("p", null, t("scanLoginHint")),
-                  qrExpired ? React.createElement("button", {
-                    type: "button",
-                    disabled: busy,
-                    onClick: () => setQrExpired(!1)
-                  }, t("refreshQrCode")) : null
-                ) : React.createElement(
-                  "div",
-                  {
-                    className: "dshRemoteClientLogin",
-                    role: "tabpanel",
-                    id: "dsh-remote-password-panel",
-                    "aria-labelledby": "dsh-remote-password-tab"
-                  },
-                  React.createElement("input", {
-                    type: "email",
-                    value: email,
-                    disabled: busy,
-                    autoComplete: "username",
-                    placeholder: t("account"),
-                    "aria-label": t("account"),
-                    onChange: (event) => setEmail(event.target.value)
-                  }),
-                  React.createElement("input", {
-                    type: "password",
-                    value: password,
-                    disabled: busy,
-                    autoComplete: "current-password",
-                    placeholder: t("password"),
-                    "aria-label": t("password"),
-                    onChange: (event) => setPassword(event.target.value)
-                  }),
-                  React.createElement("button", { type: "button", disabled: busy || savingServer || serverDirty || loginServerUrl.trim() === "" || email.trim() === "" || password === "", onClick: () => void signInClient() }, t(busy ? "signingIn" : "startSignIn"))
-                ),
-                React.createElement(
-                  "div",
-                  { className: "dshRemoteServiceAddress" },
-                  React.createElement("span", null, t("currentServiceAddress")),
-                  editingServer ? React.createElement(
-                    "form",
-                    {
-                      className: "dshRemoteLoginServer",
-                      onSubmit: (event) => {
-                        event.preventDefault(), saveLoginServer();
-                      }
-                    },
-                    React.createElement("input", {
-                      id: "dsh-remote-login-server",
-                      type: "url",
-                      required: !0,
-                      "aria-label": t("serverUrl"),
-                      value: loginServerUrl,
-                      disabled: busy || savingServer,
-                      autoComplete: "url",
-                      placeholder: t("serverUrl"),
-                      onChange: (event) => {
-                        resetLoginFlow(), setLoginServerUrl(event.target.value);
-                      }
-                    }),
-                    React.createElement("button", {
-                      type: "submit",
-                      disabled: busy || savingServer || loginServerUrl.trim() === ""
-                    }, t(savingServer ? "saving" : "save")),
-                    React.createElement("button", {
-                      type: "button",
-                      disabled: busy || savingServer,
-                      onClick: () => {
-                        setLoginServerUrl(status?.serverUrl ?? "https://dsh.r2049.cn"), setEditingServer(!1);
-                      }
-                    }, t("cancelServiceAddressEdit"))
-                  ) : React.createElement(
-                    React.Fragment,
-                    null,
-                    React.createElement("a", {
-                      href: status?.serverUrl ?? loginServerUrl,
-                      target: "_blank",
-                      rel: "noreferrer"
-                    }, status?.serverUrl ?? loginServerUrl),
-                    React.createElement("button", {
-                      type: "button",
-                      className: "dshRemoteServiceAddressEdit",
-                      disabled: busy || savingServer,
-                      title: t("editServiceAddress"),
-                      "aria-label": t("editServiceAddress"),
-                      onClick: () => setEditingServer(!0)
-                    }, React.createElement("svg", {
-                      viewBox: "0 0 24 24",
-                      width: 16,
-                      height: 16,
-                      fill: "none",
-                      stroke: "currentColor",
-                      strokeWidth: 1.8,
-                      strokeLinecap: "round",
-                      strokeLinejoin: "round",
-                      "aria-hidden": !0
-                    }, React.createElement("path", { d: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z" })))
-                  )
-                )
-              ) : null,
-              needsAuthorization !== !1 ? null : React.createElement(
+              React.createElement(
                 React.Fragment,
                 null,
                 selectedHost === void 0 ? React.createElement(
                   "section",
                   { className: "dshRemoteHosts", "aria-label": t("chooseHost") },
-                  status?.hostAuthorizationAvailable && status.host?.accountRequired ? React.createElement(
-                    "section",
-                    { className: "dshRemoteHostAccount" },
-                    React.createElement("strong", null, t("thisMachineHost")),
-                    React.createElement("p", null, t("hostSignInHint")),
-                    React.createElement(
-                      "div",
-                      { className: "dshRemoteLogin" },
-                      React.createElement("input", { type: "email", value: hostEmail, disabled: busy, autoComplete: "username", placeholder: t("serverAccountEmail"), "aria-label": t("serverAccountEmail"), onChange: (event) => setHostEmail(event.target.value) }),
-                      React.createElement("input", { type: "password", value: hostPassword, disabled: busy, autoComplete: "current-password", placeholder: t("serverAccountPassword"), "aria-label": t("serverAccountPassword"), onChange: (event) => setHostPassword(event.target.value) }),
-                      React.createElement("button", { type: "button", disabled: busy || hostEmail.trim() === "" || hostPassword === "", onClick: () => void authorizeHost("account") }, t(busy ? "signingIn" : "signInRegisterHost")),
-                      React.createElement("input", { value: hostRegistrationCode, disabled: busy, autoComplete: "one-time-code", placeholder: t("hostRegistrationCode"), "aria-label": t("hostRegistrationCode"), onChange: (event) => setHostRegistrationCode(event.target.value) }),
-                      React.createElement("button", { type: "button", disabled: busy || hostRegistrationCode.trim() === "", onClick: () => void authorizeHost("code") }, t(busy ? "registering" : "useRegistrationCode"))
-                    )
-                  ) : null,
+                  React.createElement(
+                    "details",
+                    { className: "dshLanManager" },
+                    React.createElement("summary", null, t("lanManageConnections")),
+                    React.createElement(LanSettingsPanel, { control: props.control, t, onChanged: refreshRemote, onConnect: async (id) => {
+                      let entry = (await props.control("devices")).find((item) => item.deviceId === id);
+                      if (entry === void 0 || !entry.online) throw new Error(t("connectionReachability"));
+                      await selectHost(entry);
+                    } })
+                  ),
+                  React.createElement("p", { className: "dshRemoteHint" }, t("lanDirectHint")),
                   React.createElement(
                     "div",
                     { className: "dshRemoteSectionHeading" },
@@ -3790,26 +1902,13 @@ Minimum version required to store current data is: ` + bestVersion + `.
                       "div",
                       { className: "dshRemoteSectionTitle" },
                       React.createElement("strong", null, t("chooseHost")),
-                      status?.hostAuthorizationAvailable ? React.createElement(
-                        "div",
-                        { className: "dshRemoteHostControlToggle" },
-                        React.createElement("span", null, t("allowControlDevice")),
-                        React.createElement("input", {
-                          type: "checkbox",
-                          role: "switch",
-                          disabled: busy,
-                          "aria-label": t("allowControlDevice"),
-                          checked: status.host?.authorized === !0,
-                          onChange: (event) => void setCurrentDeviceControl(event.target.checked)
-                        })
-                      ) : null,
                       connectedMenu
                     )
                   ),
                   React.createElement("div", {
                     className: `dshRemoteHostList${connectingHost === void 0 ? "" : " isCollapsed"}`,
                     "aria-busy": connectingHost === void 0 ? void 0 : !0
-                  }, listedHosts.length === 0 ? error !== void 0 ? null : React.createElement("p", null, t(busy ? "checkingConnection" : "noRemoteHosts")) : listedHosts.map((device) => React.createElement(
+                  }, listedHosts.length === 0 ? error !== void 0 ? null : React.createElement("p", null, t(busy ? "checkingConnection" : "lanNoHosts")) : listedHosts.map((device) => React.createElement(
                     "button",
                     {
                       type: "button",
@@ -3839,7 +1938,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
                   React.createElement(
                     "footer",
                     { className: "dshRemoteAccountFooter" },
-                    React.createElement("span", null, status?.target?.name ?? status?.deviceName ?? status?.host?.account ?? t("account")),
+                    React.createElement("span", null, t("lanTitle")),
                     props.openSettings === void 0 ? null : React.createElement("button", {
                       type: "button",
                       className: "dshRemoteAccountSettings",
@@ -3847,12 +1946,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
                       "aria-label": t("settings"),
                       title: t("settings")
                     }, t("settings")),
-                    React.createElement("button", {
-                      type: "button",
-                      className: "dshRemoteAccountExit",
-                      disabled: busy,
-                      onClick: () => void logoutRemote()
-                    }, t("exitRemoteAccount"))
+                    null
                   )
                 ) : null : React.createElement(
                   "section",
@@ -4328,7 +2422,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/control-route.ts
-  var CONTROL_RPC_PREFIX = "/ds-harness-remote", STATUS_STREAM_ENDPOINT = "status.events", STATUS_STREAM_PATH = `${CONTROL_RPC_PREFIX}/${STATUS_STREAM_ENDPOINT}`;
+  var CONTROL_RPC_PREFIX = "/dsh-lan", STATUS_STREAM_ENDPOINT = "status.events", STATUS_STREAM_PATH = `${CONTROL_RPC_PREFIX}/${STATUS_STREAM_ENDPOINT}`;
 
   // src/plugin-route-client.ts
   var PluginRouteFailure = class extends Error {
@@ -4623,7 +2717,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/client.ts
-  var clientModuleId = "ds-harness-remote", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error {
+  var clientModuleId = "ds-harness-lan", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error {
     constructor(message) {
       super(message), this.name = "ControlRouteUnavailableError";
     }
@@ -4647,7 +2741,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   window.__ModuleLoader__.load({
     id: clientModuleId,
     factory: (require2) => {
-      let module = { exports: {} }, React = require2("react"), RemotePluginOptions = createRemotePluginOptions(React), RemoteWorkspaceAction = createRemoteWorkspaceAction(React), RemoteProgressView = createRemoteProgressView(React), RemoteSessionHeaderAction = createRemoteSessionHeaderAction(React), openHarnessSettings;
+      let module = { exports: {} }, React = require2("react"), RemotePluginOptions = createRemotePluginOptions(React), RemoteWorkspaceAction = createRemoteWorkspaceAction(React), RemoteSessionHeaderAction = createRemoteSessionHeaderAction(React), openHarnessSettings;
       function RemoteSettingsLauncher(props) {
         return openHarnessSettings = props.openSettings, null;
       }
@@ -4658,161 +2752,13 @@ Minimum version required to store current data is: ` + bestVersion + `.
         "workspaces",
         "sessions"
       ];
-      function RemoteModeAction(props) {
-        let { t } = props, [open, setOpen] = React.useState(!1), [status, setStatus] = React.useState(void 0), [devices, setDevices] = React.useState([]), [hostRegistrationCode, setHostRegistrationCode] = React.useState(""), [email, setEmail] = React.useState(""), [password, setPassword] = React.useState(""), [busy, setBusy] = React.useState(!1), [progress, setProgress] = React.useState(void 0), progressRun = React.useRef(0), [error, setError] = React.useState(void 0), [supported, setSupported] = React.useState(!0), refresh = async () => {
-          let [nextStatus, nextDevices] = await Promise.all([
-            props.control("status"),
-            props.control("devices").catch(() => [])
-          ]);
-          setStatus(nextStatus), setDevices(nextDevices);
-        }, refreshStatus = async () => {
-          setStatus(await props.control("status"));
-        };
-        React.useEffect(() => {
-          refresh().catch((reason) => {
-            setError(messageOf(reason)), setSupported(!1);
-          });
-        }, []), React.useEffect(() => {
-          if (open)
-            return props.statusFeed.subscribe(setStatus);
-        }, [open]);
-        let switchMode = async (mode, targetDeviceId) => {
-          setBusy(!0), setError(void 0);
-          try {
-            let action = () => props.control("mode.set", { mode, ...targetDeviceId === void 0 ? {} : { targetDeviceId } });
-            setStatus(mode === "remote" && targetDeviceId !== void 0 ? await runConnectHostProgress(
-              status?.preferredTransports,
-              targetDeviceId,
-              props.control,
-              { label: "remoteProgressSwitchingWorkspace", detail: "remoteProgressSwitchingWorkspaceDetail" },
-              setProgress,
-              progressRun,
-              action,
-              connectedProgress
-            ) : await action()), window.location.reload();
-          } catch (reason) {
-            setError(messageOf(reason)), setBusy(!1);
-          }
-        }, loginHost = async () => {
-          if (!(email.trim() === "" || password === "")) {
-            setBusy(!0), setError(void 0);
-            try {
-              await props.control("host.account.login", { email: email.trim(), password }), await refreshStatus();
-            } catch (reason) {
-              setError(messageOf(reason));
-            } finally {
-              setPassword(""), setBusy(!1);
-            }
-          }
-        }, registerHostWithCode = async () => {
-          if (hostRegistrationCode.trim() !== "") {
-            setBusy(!0), setError(void 0);
-            try {
-              await props.control("host.registration-code.submit", { code: hostRegistrationCode.trim() }), setHostRegistrationCode(""), await refreshStatus();
-            } catch (reason) {
-              setError(messageOf(reason));
-            } finally {
-              setBusy(!1);
-            }
-          }
-        }, label = status?.mode === "remote" ? t("remoteTarget", { name: status.target?.name ?? t("host") }) : t("local");
-        return supported ? React.createElement(
-          React.Fragment,
-          null,
-          React.createElement("button", {
-            type: "button",
-            className: "dshRemoteModeButton",
-            title: t("switchTarget"),
-            "aria-label": t("switchTarget"),
-            onClick: () => setOpen(!0)
-          }, React.createElement("span", { "aria-hidden": !0 }, "\u25CE"), props.wide ? React.createElement("span", null, label) : null),
-          open ? React.createElement(
-            "div",
-            { className: "dshRemoteBackdrop", role: "presentation" },
-            React.createElement(
-              "section",
-              {
-                className: "dshRemoteDialog",
-                role: "dialog",
-                "aria-modal": !0,
-                "aria-label": t("harnessTarget")
-              },
-              React.createElement(
-                "div",
-                { className: "dshRemoteHeader" },
-                React.createElement("strong", null, t("harnessTarget")),
-                React.createElement("button", { type: "button", onClick: () => setOpen(!1), "aria-label": t("close") }, "\xD7")
-              ),
-              React.createElement("button", {
-                type: "button",
-                disabled: busy || status?.mode === "local",
-                onClick: () => void switchMode("local")
-              }, t("thisMachineLocal")),
-              React.createElement("div", { className: "dshRemoteDevices" }, devices.length === 0 ? React.createElement("p", null, t("noRemoteHosts")) : devices.map((device) => React.createElement("button", {
-                type: "button",
-                key: device.deviceId,
-                disabled: busy || !device.online || status?.target?.deviceId === device.deviceId,
-                onClick: () => void switchMode("remote", device.deviceId)
-              }, `${device.name} \xB7 ${t(device.online ? "online" : "offline")}`))),
-              React.createElement(RemoteProgressView, { progress, t }),
-              status?.hostAuthorizationAvailable && status.host !== void 0 ? React.createElement(
-                "div",
-                { className: "dshRemoteHostAccount" },
-                React.createElement("strong", null, t("thisMachineHost")),
-                React.createElement("p", null, status.host.online ? status.host.account === void 0 ? t("connected") : t("connectedAs", { account: status.host.account }) : status.host.accountRequired ? t("hostSignInHint") : status.host.error === void 0 ? t("checkingHost") : t("hostUnavailable", { error: connectionErrorMessage(status.host.error, t) })),
-                status.host.accountRequired ? React.createElement(
-                  "div",
-                  { className: "dshRemoteLogin" },
-                  React.createElement("input", {
-                    type: "email",
-                    value: email,
-                    disabled: busy,
-                    autoComplete: "username",
-                    placeholder: t("serverAccountEmail"),
-                    "aria-label": t("serverAccountEmail"),
-                    onChange: (event) => setEmail(event.target.value)
-                  }),
-                  React.createElement("input", {
-                    type: "password",
-                    value: password,
-                    disabled: busy,
-                    autoComplete: "current-password",
-                    placeholder: t("password"),
-                    "aria-label": t("serverAccountPassword"),
-                    onChange: (event) => setPassword(event.target.value)
-                  }),
-                  React.createElement("button", {
-                    type: "button",
-                    disabled: busy || email.trim() === "" || password === "",
-                    onClick: () => void loginHost()
-                  }, t(busy ? "signingIn" : "signInRegisterHost")),
-                  React.createElement("input", {
-                    value: hostRegistrationCode,
-                    disabled: busy,
-                    autoComplete: "one-time-code",
-                    placeholder: t("hostRegistrationCode"),
-                    "aria-label": t("hostRegistrationCode"),
-                    onChange: (event) => setHostRegistrationCode(event.target.value)
-                  }),
-                  React.createElement("button", {
-                    type: "button",
-                    disabled: busy || hostRegistrationCode.trim() === "",
-                    onClick: () => void registerHostWithCode()
-                  }, t(busy ? "registering" : "useRegistrationCode"))
-                ) : null
-              ) : null,
-              error === void 0 ? null : React.createElement("p", { className: "dshRemoteError", role: "alert" }, error)
-            )
-          ) : null
-        ) : null;
-      }
       function apply(ctx) {
         if (window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__) return;
         window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !0, readyPluginSessions(ctx.sessions), ctx.effect(() => () => {
           window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !1;
-        }, "ds-harness-remote: client singleton"), ctx.effect(() => () => {
+        }, "ds-harness-lan: client singleton"), ctx.effect(() => () => {
           pluginRouteFetch !== void 0 && window.fetch === pluginRouteFetch && (window.fetch = originalPluginFetch);
-        }, "ds-harness-remote: plugin route fetch");
+        }, "ds-harness-lan: plugin route fetch");
         let t = ctx.locale.bind(localeNamespace), remoteOpenListeners = /* @__PURE__ */ new Set(), openRemote = () => {
           for (let listener of remoteOpenListeners) listener();
         }, subscribeOpen = (listener) => (remoteOpenListeners.add(listener), () => {
@@ -4834,17 +2780,17 @@ Minimum version required to store current data is: ` + bestVersion + `.
           url: STATUS_STREAM_PATH.slice(1),
           readStatus: () => control("status"),
           onFallback: (reason) => {
-            console.warn("ds-harness-remote: status event stream unavailable, polling status instead:", reason);
+            console.warn("ds-harness-lan: status event stream unavailable, polling status instead:", reason);
           }
         });
-        ctx.effect(() => () => statusFeed.close(), "ds-harness-remote: status stream"), ctx.effect(() => {
+        ctx.effect(() => () => statusFeed.close(), "ds-harness-lan: status stream"), ctx.effect(() => {
           let unsubscribe = statusFeed.subscribe((status) => {
-            document.documentElement.classList.toggle("dshRemoteBrowserUnavailable", status.mode === "remote");
+            document.documentElement.classList.toggle("dshLanBrowserUnavailable", status.mode === "remote");
           });
           return () => {
-            unsubscribe(), document.documentElement.classList.remove("dshRemoteBrowserUnavailable");
+            unsubscribe(), document.documentElement.classList.remove("dshLanBrowserUnavailable");
           };
-        }, "ds-harness-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-remote: carrier recovery"), ctx.effect(() => {
+        }, "ds-harness-lan: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-lan: carrier recovery"), ctx.effect(() => {
           let disposed = !1, unsubscribeWorkspaces, unsubscribeSessions, selection, opening = !1, reconcile = () => {
             if (disposed || opening || selection === void 0) return;
             let pending = selection, workspaceSnapshot = ctx.workspaces.list.getSnapshot();
@@ -4877,7 +2823,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
           }), () => {
             disposed = !0, unsubscribeWorkspaces?.(), unsubscribeSessions?.();
           };
-        }, "ds-harness-remote: resume selected workspace"), ctx.inject(["fileViewer"], (fileViewerContext) => {
+        }, "ds-harness-lan: resume selected workspace"), ctx.inject(["fileViewer"], (fileViewerContext) => {
           let viewer = fileViewerContext.get("fileViewer");
           viewer !== void 0 && fileViewerContext.effect(() => {
             let unregister, latestSaveAsAllowed = !1, latestSaveAsMaxBytes = REMOTE_FILE_SAVE_AS_MAX_BYTES, unsubscribe = statusFeed.subscribe((status) => {
@@ -4890,7 +2836,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
             return () => {
               unsubscribe(), unregister?.();
             };
-          }, "ds-harness-remote: remote file viewer provider");
+          }, "ds-harness-lan: remote file viewer provider");
         });
         let RemoteMentionIcon = (props) => React.createElement(
           "svg",
@@ -4950,33 +2896,32 @@ Minimum version required to store current data is: ` + bestVersion + `.
             return () => {
               document.removeEventListener("click", stopHostFileOpen, !0), unregister();
             };
-          }, "ds-harness-remote: host mention source");
-        }), ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), "ds-harness-remote: dictionaries"), ctx.effect(() => installStyle(clientModuleId), "ds-harness-remote: client styles"), ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), "ds-harness-remote: terminal availability notice"), ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+          }, "ds-harness-lan: host mention source");
+        }), ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), "ds-harness-lan: dictionaries"), ctx.effect(() => installStyle(clientModuleId), "ds-harness-lan: client styles"), ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), "ds-harness-lan: terminal availability notice"), ctx.slots.inject("shell.overlay", () => ctx.slots.register({
           name: "shell.overlay",
-          id: "ds-harness-remote-global-context",
+          id: "ds-harness-lan-global-context",
           order: 20,
           locale: localeNamespace,
           inject: () => ({ control, statusFeed })
         }, RemoteSessionHeaderAction)), ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({
           name: "sidebar.footer.action",
-          id: "ds-harness-remote-workspace",
+          id: "ds-harness-lan-workspace",
           order: -20,
           locale: localeNamespace,
           inject: () => ({
             control,
             statusFeed,
             subscribeOpen,
-            openSettings: void 0,
-            preferredQrProvider: ctx.locale.getLocale().active === "zh" ? "zhihu" : "github"
+            openSettings: void 0
           })
         }, RemoteWorkspaceAction)), ctx.slots.inject("plugins.row.config", () => ctx.slots.register({
           name: "plugins.row.config",
-          key: "ds-harness-remote#ds-harness-remote",
+          key: "ds-harness-lan#ds-harness-lan",
           locale: localeNamespace,
           inject: () => ({ control, statusFeed, onSignIn: openRemote })
         }, RemotePluginOptions)), ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
           name: "plugins.bundle.config",
-          key: "ds-harness-remote",
+          key: "ds-harness-lan",
           locale: localeNamespace,
           inject: () => ({ control, statusFeed, onSignIn: openRemote })
         }, RemotePluginOptions));

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "DeepSeek 远程连接",
-    "description": "基于 P2P 网络，使用端到端加密远程访问 DeepSeek Harness、CodeX、Claude Code、Pi 等工作区，支持Web和移动端。"
+    "title": "DSH 局域网连接",
+    "description": "通过局域网 IP 地址和端口直连，保留 Harness、CodeX、ACP 工作区、会话、工具、文件、终端及授权预览等原有业务，业务通道使用 Noise 加密。"
   }
 }

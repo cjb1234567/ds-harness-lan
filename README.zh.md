@@ -1,3 +1,21 @@
+# DSH LAN — 社区分支
+
+`ds-harness-lan@0.5.23-lan.1` 是 [liguobao/ds-harness-remote](https://github.com/liguobao/ds-harness-remote) 的社区分支，并非 DeepSeek 官方产品。本仓库面向电脑上已有 Harness 实例之间的局域网直连，保留上游作者署名和 [MIT 许可](packages/plugin/LICENSE)。
+
+## 安装此 LAN 分支
+
+在 **插件管理 → 从 GitHub 安装**中填写仓库 **`cjb1234567/ds-harness-lan`**，待 tag 发布后选择 **`v0.5.23-lan.1`**。两台电脑安装相同修订版本后重启 Harness。这是 GitHub 安装源，不是 npm 包；本文不声称该版本已在 npm 发布。
+
+在 Host 的 LAN 设置中显式开启监听，选择可信 IPv4 网卡与端口（默认 `59090`），并设置足够强的私密共享 token；在另一台电脑填写 Host 的局域网 IP、端口及相同 token。配置细节见[双语 LAN 配置与安全说明](packages/plugin/README.md)。
+
+**安全：**首次 descriptor/token 交换使用局域网明文 HTTP，Noise IK 只加密后续业务流量，不保护首次交换。仅在可信网络与防火墙内使用，禁止公网端口转发。终端以 Host 系统用户权限执行；LAN 监听默认关闭。
+
+**范围：**本分支不发布或宣称支持下方继承的 Android、iOS、浏览器扩展、托管 Remote Web 或 Server 应用的 LAN 功能。保留的上游 README 描述上游 Remote，包括其 npm 安装和移动端发布；这些链接与操作不是本 LAN 分支的安装说明或支持声明。
+
+---
+
+## 上游 Remote 文档（保留署名与参考）
+
 <p align="center">
 
   <img src="docs/logo.svg" alt="DeepSeek Harness Remote" width="600">

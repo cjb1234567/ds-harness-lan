@@ -1,8 +1,8 @@
 {
   "$schema": "https://dsh.community/schemas/dsh-plugin-0.15.json",
-  "id": "com.r2049.ds-harness-remote",
-  "name": "ds-harness-remote",
-  "version": "0.5.23",
+  "id": "community.ds-harness-lan",
+  "name": "ds-harness-lan",
+  "version": "0.5.23-lan.1",
   "manifestVersion": "0.15",
   "facets": {
     "host": {
@@ -21,21 +21,21 @@
   "contributes": {
     "commands": [
       {
-        "id": "ds-harness.remote",
-        "title": "Manage Remote Host login and connection status"
+        "id": "ds-harness.lan",
+        "title": "Manage DSH LAN Host and direct connection status"
       }
     ]
   },
   "permissions": [
     {
       "name": "commands.invoke",
-      "scope": "ds-harness.remote",
-      "reason": "run /remote status, login, and logout from dsh-TUI"
+      "scope": "ds-harness.lan",
+      "reason": "manage LAN Host and direct IP-and-port connection status from dsh-TUI"
     }
   ],
   "subscriptions": [],
   "license": "MIT",
   "source": {
-    "repository": "https://github.com/liguobao/ds-harness-remote"
+    "repository": "https://github.com/cjb1234567/ds-harness-lan"
   }
 }

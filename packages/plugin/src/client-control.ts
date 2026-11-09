@@ -24,6 +24,7 @@ import { ClientServerApi } from './server-api.js'
 export interface ClientControlContext {
   readonly detailedStatus: () => Promise<Record<string, unknown>>
   readonly devices: () => Promise<RemoteDeviceView[]>
+  readonly lan?: boolean
   readonly server: ClientServerApi
   readonly authorizeClientWithAccount: (email: string, password: string) => Promise<unknown>
   readonly startClientOAuthQrLogin: (provider: OAuthProvider) => Promise<unknown>
@@ -60,7 +61,11 @@ export class ClientControl {
     try {
       if (endpoint === 'status') return ok(await this.context.detailedStatus())
       if (endpoint === 'client.authorization.status') {
-        return ok({ hasCredentials: await this.context.server.hasStoredAuthorization() })
+        return ok({ hasCredentials: this.context.lan === true || await this.context.server.hasStoredAuthorization(), ...(this.context.lan ? { mode: 'lan' } : {}) })
+      }
+      if (this.context.lan && (endpoint.startsWith('client.account.') || endpoint === 'host.account.login'
+        || endpoint === 'host.registration-code.submit')) {
+        throw new ClientModeError('LAN_ACCOUNT_UNAVAILABLE', 'Account login is unavailable in LAN mode. Configure the Host address and LAN access token locally.')
       }
       if (endpoint === 'devices') return ok(await this.context.devices())
       if (endpoint === 'client.account.providers') return ok(await this.context.server.oauthProviders())

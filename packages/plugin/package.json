@@ -1,7 +1,7 @@
 {
-  "name": "ds-harness-remote",
-  "version": "0.5.23",
-  "description": "End-to-end encrypted remote access to DeepSeek Harness and experimental Codex workspaces from desktop, web, and Android, with dsh-TUI Host support.",
+  "name": "ds-harness-lan",
+  "version": "0.5.23-lan.1",
+  "description": "Community LAN fork of ds-harness-remote: direct IP-and-port connections with shared-token authentication and Noise-encrypted Harness, CodeX and ACP workspace access.",
   "keywords": [
     "deepseek",
     "deepseek-harness",
@@ -10,27 +10,22 @@
     "codex",
     "remote-development",
     "end-to-end-encryption",
-    "webrtc"
+    "lan",
+    "direct-connection"
   ],
-  "homepage": "https://github.com/liguobao/ds-harness-remote#readme",
+  "homepage": "https://github.com/cjb1234567/ds-harness-lan#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liguobao/ds-harness-remote.git"
+    "url": "git+https://github.com/cjb1234567/ds-harness-lan.git"
   },
   "bugs": {
-    "url": "https://github.com/liguobao/ds-harness-remote/issues"
+    "url": "https://github.com/cjb1234567/ds-harness-lan/issues"
   },
   "author": "liguobao <lgb835485368@gmail.com>",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
-  "bin": {
-    "ds-harness-remote": "./bin/ds-harness-remote.js"
-  },
   "types": "./public.d.ts",
   "exports": {
     ".": {
@@ -41,17 +36,17 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
     "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./icon": "./icon.svg"
   },
   "files": [
-    "bin",
     "dist",
-    "dsh-plugin.json",
     "cordis.patch.yml",
     "locale",
     "public.d.ts",
-    "README.md",
-    "LICENSE"
+    "LICENSE",
+    "icon.svg",
+    "README.md"
   ],
   "dsh": {
     "bundle": {
@@ -73,9 +68,9 @@
     }
   },
   "scripts": {
-    "build": "node scripts/verify-version-sync.mjs && tsc -p tsconfig.json && node scripts/build-bundles.mjs",
-    "check": "node scripts/verify-version-sync.mjs && tsc -p tsconfig.test.json",
-    "test": "node scripts/verify-version-sync.mjs && vitest run"
+    "build": "tsc -p tsconfig.json && node scripts/build-bundles.mjs",
+    "check": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.5",
@@ -84,9 +79,6 @@
     "ws": "^8.21.3",
     "@xterm/headless": "6.0.0",
     "@xterm/addon-serialize": "0.14.0"
-  },
-  "optionalDependencies": {
-    "@roamhq/wrtc": "0.10.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1 <5 || >=4.0.5-alpha.1 <4.0.6-0",

@@ -27,7 +27,7 @@ export interface HmrContextLike {
   }
 }
 
-const PUMP_KEY = Symbol.for('ds-harness-remote.hmr-safe-settings-pump')
+const PUMP_KEY = Symbol.for('ds-harness-lan.hmr-safe-settings-pump')
 
 function createPump(): Pump {
   const queue: Job<unknown>[] = []

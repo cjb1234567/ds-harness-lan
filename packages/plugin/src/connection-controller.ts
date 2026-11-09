@@ -60,7 +60,8 @@ export class ConnectionController {
   private async acceptOne(channel: AuthenticatedPeerChannel): Promise<void> {
     if (channel.security?.protocol !== 'Noise_IK_25519_ChaChaPoly_SHA256'
       || channel.security.connectionId === ''
-      || channel.security.membershipId === '') {
+      || (channel.security.kind !== 'local-pairing'
+        && (typeof channel.security.membershipId !== 'string' || channel.security.membershipId === ''))) {
       await channel.close('SECURE_CHANNEL_FAILED')
       throw new ConnectionRejectedError('SECURE_CHANNEL_FAILED', 'The channel is missing its authenticated Noise or membership context.')
     }

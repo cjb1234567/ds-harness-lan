@@ -1,35 +1,29 @@
-import QRCode from 'qrcode'
 import type { Translate } from '../client-locale.js'
-import type { OAuthProviderInfo } from '../server-api.js'
 import type { StatusFeed } from '../status-stream.js'
 import { deepSeekWorkspaceIcon, gptWorkspaceIcon } from './icons.js'
 import { pendingWorkspaceSelectionKey } from './navigation.js'
 import { connectedClientModeLabel, connectedProgress, connectionErrorMessage, formatPlatform, messageOf } from './presentation.js'
 import { createRemoteProgressView, runConnectHostProgress } from './progress.js'
+import { createLanSettingsPanel } from './settings.js'
 import type {
   ClientReact,
   CodexWorkspaceView,
   CursorWorkspaceView,
-  LoginMethod,
-  OAuthProvider,
-  OAuthQrPollResult,
-  OAuthQrSession,
   RemoteConnectionProgress,
   RemoteDevice,
   RemoteDirectoryListing,
   RemoteStatus,
   RemoteWorkspaceView,
-  PluginSettingsView,
 } from './types.js'
 
 export function createRemoteWorkspaceAction(React: ClientReact) {
   const RemoteProgressView = createRemoteProgressView(React)
+  const LanSettingsPanel = createLanSettingsPanel(React)
   function RemoteWorkspaceAction(props: {
     wide: boolean
     control: <T>(endpoint: string, payload?: unknown) => Promise<T>
     statusFeed: StatusFeed<RemoteStatus>
     subscribeOpen: (listener: () => void) => () => void
-    preferredQrProvider: OAuthProvider
     t: Translate
     openSettings?: () => void
   }): unknown {
@@ -87,31 +81,8 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
     const opencodeWorkspaceListId = 'dsh-remote-opencode-workspace-list'
     const claudeWorkspaceListId = 'dsh-remote-claude-workspace-list'
     const [busy, setBusy] = React.useState(false)
-    // Remain undecided until local credentials or an explicit auth rejection
-    // establish that login is required. Network failures are not sign-outs.
-    const [needsAuthorization, setNeedsAuthorization] = React.useState<boolean | undefined>(undefined)
-    const [email, setEmail] = React.useState('')
-    const [password, setPassword] = React.useState('')
-    const [loginServerUrl, setLoginServerUrl] = React.useState('https://dsh.r2049.cn')
-    const [editingServer, setEditingServer] = React.useState(false)
-    const [savingServer, setSavingServer] = React.useState(false)
-    const serverDirty = loginServerUrl.trim() !== (status?.serverUrl ?? '')
-    const [loginMethod, setLoginMethod] = React.useState<LoginMethod>('password')
-    const loginMethodManuallySelected = React.useRef(false)
-    const [oauthProviders, setOAuthProviders] = React.useState<OAuthProviderInfo[]>([])
-    const [providersLoading, setProvidersLoading] = React.useState(false)
-    const [providersFailed, setProvidersFailed] = React.useState(false)
-    const [providerReload, setProviderReload] = React.useState(0)
-    const providerRequestRun = React.useRef(0)
-    const [qrSession, setQrSession] = React.useState<OAuthQrSession | undefined>(undefined)
-    const [qrImage, setQrImage] = React.useState<string | undefined>(undefined)
-    const [qrExpired, setQrExpired] = React.useState(false)
-    const [hostEmail, setHostEmail] = React.useState('')
-    const [hostPassword, setHostPassword] = React.useState('')
-    const [hostRegistrationCode, setHostRegistrationCode] = React.useState('')
     const [progress, setProgress] = React.useState<RemoteConnectionProgress | undefined>(undefined)
     const progressRun = React.useRef(0)
-    const qrFlowRun = React.useRef(0)
     const pageRef = React.useRef<HTMLElement | null>(null)
     const [notice, setNotice] = React.useState<string | undefined>(undefined)
     const [error, setError] = React.useState<string | undefined>(undefined)
@@ -119,7 +90,6 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
     React.useEffect(() => {
       if (!open) {
         setDevicesOpen(false)
-        qrFlowRun.current += 1
         setBusy(false)
       }
     }, [open])
@@ -166,160 +136,12 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
     }, [])
 
     React.useEffect(() => {
-      if (status?.serverUrl !== undefined) {
-        setLoginServerUrl(status.serverUrl)
-      }
-    }, [status?.serverUrl])
-
-    React.useEffect(() => {
       const remoteActive = status?.mode === 'remote'
       document.documentElement.classList.toggle('dshRemoteTargetActive', remoteActive)
       return () => {
         if (remoteActive) document.documentElement.classList.remove('dshRemoteTargetActive')
       }
     }, [status?.mode])
-
-    const startQrLogin = async (provider: OAuthProvider): Promise<void> => {
-      const run = ++qrFlowRun.current
-      setBusy(true)
-      setError(undefined)
-      setQrExpired(false)
-      try {
-        const session = await props.control<OAuthQrSession>('client.account.qr.start', { provider })
-        const image = await QRCode.toDataURL(session.scanUrl, {
-          width: 184,
-          margin: 1,
-          errorCorrectionLevel: 'L',
-        })
-        if (run !== qrFlowRun.current) return
-        setQrSession(session)
-        setQrImage(image)
-      } catch (reason) {
-        if (run === qrFlowRun.current) setError(messageOf(reason))
-      } finally {
-        if (run === qrFlowRun.current) setBusy(false)
-      }
-    }
-
-    React.useEffect(() => {
-      if (!open || !needsAuthorization || savingServer || serverDirty) return
-      let active = true
-      const run = ++providerRequestRun.current
-      qrFlowRun.current += 1
-      setBusy(false)
-      setQrSession(undefined)
-      setQrImage(undefined)
-      setQrExpired(false)
-      setOAuthProviders([])
-      setProvidersLoading(true)
-      setProvidersFailed(false)
-      void props.control<OAuthProviderInfo[]>('client.account.providers').then(items => {
-        if (!active || run !== providerRequestRun.current) return
-        const available = items.filter(item => item.qrStartUrl != null)
-        setOAuthProviders(available)
-        setLoginMethod(current => {
-          if (loginMethodManuallySelected.current && (current === 'password'
-            || available.some(item => `oauth:${item.id}` === current))) return current
-          const preferred = available.find(item => item.id === props.preferredQrProvider) ?? available[0]
-          return preferred === undefined ? 'password' : `oauth:${preferred.id}`
-        })
-      }).catch(reason => {
-        if (!active || run !== providerRequestRun.current) return
-        setProvidersFailed(true)
-        setLoginMethod('password')
-        setError(messageOf(reason))
-      }).finally(() => {
-        if (active && run === providerRequestRun.current) setProvidersLoading(false)
-      })
-      return () => { active = false }
-    }, [open, needsAuthorization, status?.serverUrl, props.preferredQrProvider, providerReload, savingServer, serverDirty])
-
-    React.useEffect(() => {
-      if (!open || !needsAuthorization || savingServer || serverDirty || providersLoading || loginMethod === 'password'
-        || !oauthProviders.some(item => `oauth:${item.id}` === loginMethod) || qrSession !== undefined || qrExpired) return
-      void startQrLogin(loginMethod.slice(6))
-    }, [open, needsAuthorization, providersLoading, oauthProviders, loginMethod, qrSession, qrExpired, savingServer, serverDirty])
-
-    React.useEffect(() => {
-      if (!open || savingServer || serverDirty || loginMethod === 'password' || qrSession === undefined) return
-      let active = true
-      let polling = false
-      let settled = false
-      const run = qrFlowRun.current
-      let timer: number | undefined
-      const poll = (): void => {
-        if (polling || settled) return
-        polling = true
-        void props.control<OAuthQrPollResult>('client.account.qr.poll', { qrId: qrSession.qrId }).then(async result => {
-          if (!active || settled || run !== qrFlowRun.current) return
-          if (result.status === 'complete') {
-            settled = true
-            if (timer !== undefined) window.clearInterval(timer)
-            setBusy(true)
-            setError(undefined)
-            setQrExpired(false)
-            try {
-              const [nextDevices, nextStatus] = await Promise.all([
-                props.control<RemoteDevice[]>('devices'),
-                props.control<RemoteStatus>('status'),
-              ])
-              if (active && run === qrFlowRun.current) {
-                setDevices(nextDevices)
-                setStatus(nextStatus)
-                setNeedsAuthorization(false)
-              }
-            } catch (reason) {
-              if (active && run === qrFlowRun.current) setError(connectionErrorMessageFor(reason, t))
-            } finally {
-              if (run === qrFlowRun.current) {
-                setQrSession(undefined)
-                setQrImage(undefined)
-                setBusy(false)
-              }
-            }
-          } else if (result.status === 'expired') {
-            settled = true
-            if (timer !== undefined) window.clearInterval(timer)
-            setQrExpired(true)
-            setQrSession(undefined)
-            setQrImage(undefined)
-          }
-        }).catch(reason => {
-          if (active && !settled && run === qrFlowRun.current) setError(messageOf(reason))
-        }).finally(() => {
-          polling = false
-        })
-      }
-      poll()
-      timer = window.setInterval(poll, 1_500)
-      return () => {
-        active = false
-        if (timer !== undefined) window.clearInterval(timer)
-      }
-    }, [open, loginMethod, qrSession, savingServer, serverDirty])
-
-    const selectLoginMethod = (method: LoginMethod): void => {
-      loginMethodManuallySelected.current = true
-      if (method === loginMethod) return
-      qrFlowRun.current += 1
-      setLoginMethod(method)
-      setQrSession(undefined)
-      setQrImage(undefined)
-      setQrExpired(false)
-      setError(undefined)
-    }
-
-    const orderedQrProviders = [...oauthProviders].sort((a, b) =>
-      Number(b.id === props.preferredQrProvider) - Number(a.id === props.preferredQrProvider))
-    const selectedProvider = oauthProviders.find(item => `oauth:${item.id}` === loginMethod)
-    const scanLabel = t('scanWithProvider', { provider: selectedProvider?.displayName ?? '' })
-
-    const qrLoginTab = (provider: OAuthProviderInfo): unknown => React.createElement('button', {
-      key: provider.id, type: 'button', role: 'tab', id: `dsh-remote-oauth:${provider.id}-tab`,
-      'aria-selected': loginMethod === `oauth:${provider.id}`, 'aria-controls': `dsh-remote-oauth:${provider.id}-panel`,
-      className: loginMethod === `oauth:${provider.id}` ? 'isActive' : '', disabled: busy,
-      onClick: () => selectLoginMethod(`oauth:${provider.id}`),
-    }, t('providerLogin', { provider: provider.displayName }))
 
     const selectHost = async (host: RemoteDevice): Promise<void> => {
       setBusy(true)
@@ -480,13 +302,11 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
         const nextStatus = await props.control<RemoteStatus>('status')
         setStatus(nextStatus)
         if (nextStatus.controlUnavailable) {
-          setNeedsAuthorization(undefined)
           setError(t('remoteControlUnavailable'))
           return
         }
         if (!nextStatus.available) {
           setDevices([])
-          setNeedsAuthorization(false)
           setSelectedHost(undefined)
           setWorkspaces([])
           setCodexWorkspaces([])
@@ -515,13 +335,8 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
           return
         }
         try {
-          const authorization = await props.control<{ hasCredentials: boolean }>('client.authorization.status')
-          if (!authorization.hasCredentials) {
-            throw Object.assign(new Error('Remote account authorization is required.'), { code: 'ACCOUNT_AUTH_REQUIRED' })
-          }
           const nextDevices = await props.control<RemoteDevice[]>('devices')
           setDevices(nextDevices)
-          setNeedsAuthorization(false)
           if (selectedHost !== undefined) {
             const nextSelectedHost = nextDevices.find(device => device.deviceId === selectedHost.deviceId)
             if (nextSelectedHost === undefined) {
@@ -569,42 +384,7 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
             }
           }
         } catch (reason) {
-          // A transient Server outage is not a sign-out. Keep the last known
-          // device/session view and only show login for explicit auth failures.
-          const code = typeof reason === 'object' && reason !== null && 'code' in reason
-            ? String((reason as { code: unknown }).code)
-            : ''
-          if (['ACCOUNT_AUTH_REQUIRED', 'AUTH_INVALID', 'AUTH_REQUIRED', 'TOKEN_EXPIRED', 'DEVICE_REVOKED', 'DEVICE_OWNERSHIP_REQUIRED'].includes(code)) {
-            setDevices([])
-            setNeedsAuthorization(true)
-            setSelectedHost(undefined)
-            setWorkspaces([])
-            setCodexWorkspaces([])
-            setCursorWorkspaces([])
-            setAntigravityWorkspaces([])
-            setPiWorkspaces([])
-            setOpencodeWorkspaces([])
-            setClaudeWorkspaces([])
-            setShowAllWorkspaces(false)
-            setShowAllCodexWorkspaces(false)
-            setShowAllCursorWorkspaces(false)
-            setShowAllAntigravityWorkspaces(false)
-            setShowAllPiWorkspaces(false)
-            setShowAllOpencodeWorkspaces(false)
-            setShowAllClaudeWorkspaces(false)
-            setWorkspaceBackend('harness')
-            setCodexWorkspaceId(undefined)
-            setCursorWorkspaceId(undefined)
-            setAntigravityWorkspaceId(undefined)
-            setPiWorkspaceId(undefined)
-            setOpencodeWorkspaceId(undefined)
-            setClaudeWorkspaceId(undefined)
-            setPath('')
-            setAddingWorkspace(false)
-            setDirectory(undefined)
-          } else {
-            setError(messageOf(reason))
-          }
+          setError(connectionErrorMessageFor(reason, t))
         }
       } catch (reason) {
         setError(connectionErrorMessageFor(reason, t))
@@ -664,89 +444,6 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
       setError(undefined)
     }
 
-    const resetLoginFlow = (): void => {
-      providerRequestRun.current += 1
-      qrFlowRun.current += 1
-      setQrSession(undefined)
-      setQrImage(undefined)
-      setQrExpired(false)
-      setOAuthProviders([])
-      setProvidersFailed(false)
-      setProvidersLoading(false)
-      setLoginMethod('password')
-      loginMethodManuallySelected.current = false
-      setPassword('')
-      setError(undefined)
-      setNotice(undefined)
-    }
-
-    const saveLoginServer = async (): Promise<void> => {
-      if (loginServerUrl.trim() === '' || savingServer) return
-      resetLoginFlow()
-      setSavingServer(true)
-      setBusy(true)
-      try {
-        const view = await props.control<PluginSettingsView>('settings.server.set', { serverUrl: loginServerUrl.trim() })
-        if (view.applies !== 'live') {
-          setNotice(t('serverSaved'))
-          return
-        }
-        const nextStatus = await props.control<RemoteStatus>('status')
-        setStatus(nextStatus)
-        setLoginServerUrl(nextStatus.serverUrl ?? loginServerUrl.trim())
-        setEditingServer(false)
-        setProviderReload(value => value + 1)
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
-        setSavingServer(false)
-        setBusy(false)
-      }
-    }
-
-    const signInClient = async (): Promise<void> => {
-      if (serverDirty || savingServer || email.trim() === '' || password === '' || loginServerUrl.trim() === '') return
-      setBusy(true)
-      setError(undefined)
-      try {
-        await props.control('settings.configure', {
-          role: 'client',
-          serverUrl: loginServerUrl.trim(),
-          email: email.trim(),
-          password,
-        })
-        setDevices(await props.control<RemoteDevice[]>('devices'))
-        setStatus(await props.control<RemoteStatus>('status'))
-        setNeedsAuthorization(false)
-        setPassword('')
-      } catch (reason) {
-        setError(connectionErrorMessageFor(reason, t))
-      } finally {
-        setBusy(false)
-      }
-    }
-
-    const authorizeHost = async (kind: 'account' | 'code'): Promise<void> => {
-      if (kind === 'account' && (hostEmail.trim() === '' || hostPassword === '')) return
-      if (kind === 'code' && hostRegistrationCode.trim() === '') return
-      setBusy(true)
-      setError(undefined)
-      try {
-        if (kind === 'account') {
-          await props.control('host.account.login', { email: hostEmail.trim(), password: hostPassword })
-          setHostPassword('')
-        } else {
-          await props.control('host.registration-code.submit', { code: hostRegistrationCode.trim() })
-          setHostRegistrationCode('')
-        }
-        setStatus(await props.control<RemoteStatus>('status'))
-      } catch (reason) {
-        setError(connectionErrorMessageFor(reason, t))
-      } finally {
-        setBusy(false)
-      }
-    }
-
     const openLocalWorkspaces = async (): Promise<void> => {
       setBusy(true)
       setError(undefined)
@@ -755,51 +452,6 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
         window.location.reload()
       } catch (reason) {
         setError(messageOf(reason))
-        setBusy(false)
-      }
-    }
-
-    const setCurrentDeviceControl = async (enabled: boolean): Promise<void> => {
-      setBusy(true)
-      setError(undefined)
-      try {
-        setStatus(await props.control<RemoteStatus>('host.authorization.set', { enabled }))
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
-        setBusy(false)
-      }
-    }
-
-    const logoutRemote = async (): Promise<void> => {
-      qrFlowRun.current += 1
-      progressRun.current += 1
-      setBusy(true)
-      setError(undefined)
-      try {
-        await props.control('settings.logout')
-        setDevices([])
-        setSelectedHost(undefined)
-        setConnectingHost(undefined)
-        setWorkspaces([])
-        setCodexWorkspaces([])
-        setCursorWorkspaces([])
-        setAntigravityWorkspaces([])
-        setPiWorkspaces([])
-        setOpencodeWorkspaces([])
-        setClaudeWorkspaces([])
-        setDirectory(undefined)
-        setPath('')
-        setPassword('')
-        setProgress(undefined)
-        setNeedsAuthorization(true)
-        setQrSession(undefined)
-        setQrImage(undefined)
-        setQrExpired(false)
-        setStatus(await props.control<RemoteStatus>('status'))
-      } catch (reason) {
-        setError(messageOf(reason))
-      } finally {
         setBusy(false)
       }
     }
@@ -903,7 +555,7 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
     const connectedClients = status?.host?.connectedClients ?? []
     const connectedCount = connectedClients.length
     const connectedCountLabel = t('connectedClientCount', { count: connectedCount })
-    const connectedMenu = !needsAuthorization && status?.hostAuthorizationAvailable === true
+    const connectedMenu = status?.hostAuthorizationAvailable === true
       ? React.createElement('div', {
         className: `dshRemoteConnectedMenu${devicesOpen ? ' isOpen' : ''}`,
       },
@@ -1029,139 +681,26 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
             onClick: () => void openLocalWorkspaces(),
           }, t('openLocalWorkspaces')) : null,
           React.createElement(React.Fragment, null,
-            needsAuthorization === undefined && busy
-              ? React.createElement('p', null, t('checkingConnection')) : null,
-            needsAuthorization ? React.createElement('section', { className: 'dshRemoteEnable' },
-              React.createElement('div', { className: 'dshRemoteLoginHeading' },
-                React.createElement('a', {
-                  href: 'https://github.com/liguobao/ds-harness-remote',
-                  target: '_blank', rel: 'noopener noreferrer',
-                },
-                  React.createElement('strong', { className: 'dshRemoteLoginTitle' }, t('signInClient')),
-                  React.createElement('span', null, t('signInClientDescription')))),
-              React.createElement('div', { className: 'dshRemoteLoginTabs', role: 'tablist' },
-                ...orderedQrProviders.map(qrLoginTab),
-                React.createElement('button', {
-                  type: 'button', role: 'tab', id: 'dsh-remote-password-tab',
-                  'aria-selected': loginMethod === 'password', 'aria-controls': 'dsh-remote-password-panel',
-                  className: loginMethod === 'password' ? 'isActive' : '', disabled: busy || savingServer || serverDirty,
-                  onClick: () => selectLoginMethod('password'),
-                }, t('accountPasswordLogin'))),
-              providersLoading ? React.createElement('p', { role: 'status' }, t('loadingLoginProviders')) : null,
-              providersFailed ? React.createElement('button', {
-                type: 'button', disabled: busy || savingServer || serverDirty,
-                onClick: () => { setError(undefined); setProviderReload(value => value + 1) },
-              }, t('retryLoginProviders')) : null,
-              !savingServer && !serverDirty && !providersLoading && !providersFailed && oauthProviders.length === 0
-                ? React.createElement('p', { role: 'status' }, t('noLoginProviders')) : null,
-              loginMethod !== 'password' && selectedProvider !== undefined
-                ? React.createElement('div', {
-                  className: 'dshRemoteQrLogin', role: 'tabpanel', id: `dsh-remote-${loginMethod}-panel`,
-                  'aria-labelledby': `dsh-remote-${loginMethod}-tab`,
-                },
-                  qrImage === undefined
-                    ? React.createElement('div', { className: 'dshRemoteQrPlaceholder', 'aria-busy': busy },
-                      qrExpired ? React.createElement('p', null, t('qrLoginExpired')) : React.createElement('span', null, t('checkingConnection')))
-                    : qrSession !== undefined
-                      ? React.createElement('a', {
-                        className: 'dshRemoteQrOpen', href: qrSession.scanUrl,
-                        target: '_blank', rel: 'noopener noreferrer',
-                        'aria-label': t('openInBrowser'),
-                      },
-                        React.createElement('img', {
-                          src: qrImage, width: 184, height: 184,
-                          alt: scanLabel,
-                        }),
-                        React.createElement('span', null, t('openInBrowser'), ' ↗'))
-                      : null,
-                  React.createElement('strong', null, scanLabel),
-                  React.createElement('p', null, t('scanLoginHint')),
-                  qrExpired ? React.createElement('button', {
-                    type: 'button', disabled: busy, onClick: () => setQrExpired(false),
-                  }, t('refreshQrCode')) : null)
-                : React.createElement('div', {
-                  className: 'dshRemoteClientLogin', role: 'tabpanel', id: 'dsh-remote-password-panel',
-                  'aria-labelledby': 'dsh-remote-password-tab',
-                },
-                  React.createElement('input', {
-                    type: 'email', value: email, disabled: busy, autoComplete: 'username', placeholder: t('account'),
-                    'aria-label': t('account'), onChange: (event: Event) => setEmail((event.target as HTMLInputElement).value),
-                  }),
-                  React.createElement('input', {
-                    type: 'password', value: password, disabled: busy, autoComplete: 'current-password', placeholder: t('password'),
-                    'aria-label': t('password'), onChange: (event: Event) => setPassword((event.target as HTMLInputElement).value),
-                  }),
-                  React.createElement('button', { type: 'button', disabled: busy || savingServer || serverDirty || loginServerUrl.trim() === '' || email.trim() === '' || password === '', onClick: () => void signInClient() }, t(busy ? 'signingIn' : 'startSignIn'))),
-              React.createElement('div', { className: 'dshRemoteServiceAddress' },
-                React.createElement('span', null, t('currentServiceAddress')),
-                editingServer
-                  ? React.createElement('form', {
-                    className: 'dshRemoteLoginServer',
-                    onSubmit: (event: Event) => { event.preventDefault(); void saveLoginServer() },
-                  },
-                    React.createElement('input', {
-                      id: 'dsh-remote-login-server', type: 'url', required: true,
-                      'aria-label': t('serverUrl'), value: loginServerUrl,
-                      disabled: busy || savingServer, autoComplete: 'url',
-                      placeholder: t('serverUrl'), onChange: (event: Event) => {
-                        resetLoginFlow()
-                        setLoginServerUrl((event.target as HTMLInputElement).value)
-                      },
-                    }),
-                    React.createElement('button', {
-                      type: 'submit', disabled: busy || savingServer || loginServerUrl.trim() === '',
-                    }, t(savingServer ? 'saving' : 'save')),
-                    React.createElement('button', {
-                      type: 'button', disabled: busy || savingServer,
-                      onClick: () => {
-                        setLoginServerUrl(status?.serverUrl ?? 'https://dsh.r2049.cn')
-                        setEditingServer(false)
-                      },
-                    }, t('cancelServiceAddressEdit')))
-                  : React.createElement(React.Fragment, null,
-                    React.createElement('a', {
-                      href: status?.serverUrl ?? loginServerUrl, target: '_blank', rel: 'noreferrer',
-                    }, status?.serverUrl ?? loginServerUrl),
-                    React.createElement('button', {
-                      type: 'button', className: 'dshRemoteServiceAddressEdit',
-                      disabled: busy || savingServer,
-                      title: t('editServiceAddress'), 'aria-label': t('editServiceAddress'),
-                      onClick: () => setEditingServer(true),
-                    }, React.createElement('svg', {
-                      viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none',
-                      stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
-                      'aria-hidden': true,
-                    }, React.createElement('path', { d: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z' })))))) : null,
-            needsAuthorization !== false ? null : React.createElement(React.Fragment, null,
+            React.createElement(React.Fragment, null,
               selectedHost === undefined ? React.createElement('section', { className: 'dshRemoteHosts', 'aria-label': t('chooseHost') },
-                status?.hostAuthorizationAvailable && status.host?.accountRequired
-                  ? React.createElement('section', { className: 'dshRemoteHostAccount' },
-                    React.createElement('strong', null, t('thisMachineHost')),
-                    React.createElement('p', null, t('hostSignInHint')),
-                    React.createElement('div', { className: 'dshRemoteLogin' },
-                      React.createElement('input', { type: 'email', value: hostEmail, disabled: busy, autoComplete: 'username', placeholder: t('serverAccountEmail'), 'aria-label': t('serverAccountEmail'), onChange: (event: Event) => setHostEmail((event.target as HTMLInputElement).value) }),
-                      React.createElement('input', { type: 'password', value: hostPassword, disabled: busy, autoComplete: 'current-password', placeholder: t('serverAccountPassword'), 'aria-label': t('serverAccountPassword'), onChange: (event: Event) => setHostPassword((event.target as HTMLInputElement).value) }),
-                      React.createElement('button', { type: 'button', disabled: busy || hostEmail.trim() === '' || hostPassword === '', onClick: () => void authorizeHost('account') }, t(busy ? 'signingIn' : 'signInRegisterHost')),
-                      React.createElement('input', { value: hostRegistrationCode, disabled: busy, autoComplete: 'one-time-code', placeholder: t('hostRegistrationCode'), 'aria-label': t('hostRegistrationCode'), onChange: (event: Event) => setHostRegistrationCode((event.target as HTMLInputElement).value) }),
-                      React.createElement('button', { type: 'button', disabled: busy || hostRegistrationCode.trim() === '', onClick: () => void authorizeHost('code') }, t(busy ? 'registering' : 'useRegistrationCode'))))
-                  : null,
+                React.createElement('details', { className: 'dshLanManager' },
+                  React.createElement('summary', null, t('lanManageConnections')),
+                  React.createElement(LanSettingsPanel, { control: props.control, t, onChanged: refreshRemote, onConnect: async (id: string) => {
+                    const hosts = await props.control<RemoteDevice[]>('devices')
+                    const entry = hosts.find(item => item.deviceId === id)
+                    if (entry === undefined || !entry.online) throw new Error(t('connectionReachability'))
+                    await selectHost(entry)
+                  } })),
+                React.createElement('p', { className: 'dshRemoteHint' }, t('lanDirectHint')),
                 React.createElement('div', { className: 'dshRemoteSectionHeading' },
                   React.createElement('div', { className: 'dshRemoteSectionTitle' },
                     React.createElement('strong', null, t('chooseHost')),
-                    status?.hostAuthorizationAvailable ? React.createElement('div', { className: 'dshRemoteHostControlToggle' },
-                      React.createElement('span', null, t('allowControlDevice')),
-                      React.createElement('input', {
-                        type: 'checkbox', role: 'switch', disabled: busy,
-                        'aria-label': t('allowControlDevice'),
-                        checked: status.host?.authorized === true,
-                        onChange: (event: Event) => void setCurrentDeviceControl((event.target as HTMLInputElement).checked),
-                      })) : null,
                     connectedMenu)),
                 React.createElement('div', {
                   className: `dshRemoteHostList${connectingHost === undefined ? '' : ' isCollapsed'}`,
                   'aria-busy': connectingHost === undefined ? undefined : true,
                 }, listedHosts.length === 0
-                  ? (error !== undefined ? null : React.createElement('p', null, busy ? t('checkingConnection') : t('noRemoteHosts')))
+                  ? (error !== undefined ? null : React.createElement('p', null, busy ? t('checkingConnection') : t('lanNoHosts')))
                   : listedHosts.map(device => React.createElement('button', {
                     type: 'button',
                     key: device.deviceId,
@@ -1181,16 +720,13 @@ export function createRemoteWorkspaceAction(React: ClientReact) {
                 ? (connectingHost === undefined ? React.createElement(React.Fragment, null,
                   React.createElement('p', { className: 'dshRemoteHint' }, t('selectHostHint')),
                   React.createElement('footer', { className: 'dshRemoteAccountFooter' },
-                    React.createElement('span', null, status?.target?.name ?? status?.deviceName ?? status?.host?.account ?? t('account')),
+                    React.createElement('span', null, t('lanTitle')),
                     props.openSettings === undefined ? null : React.createElement('button', {
                       type: 'button', className: 'dshRemoteAccountSettings',
                       onClick: props.openSettings,
                       'aria-label': t('settings'), title: t('settings'),
                     }, t('settings')),
-                    React.createElement('button', {
-                      type: 'button', className: 'dshRemoteAccountExit', disabled: busy,
-                      onClick: () => void logoutRemote(),
-                    }, t('exitRemoteAccount')))) : null)
+                    null)) : null)
                 : React.createElement('section', { className: 'dshRemoteBrowser', 'aria-label': t('chooseDirectory') },
                   React.createElement('div', { className: 'dshRemoteSectionHeading dshRemoteWorkspaceHeading' },
                     React.createElement('strong', null, t(addingWorkspace

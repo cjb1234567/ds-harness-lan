@@ -1,6 +1,6 @@
 - insert:
-    - id: ds-harness-remote
-      name: 'ds-harness-remote'
+    - id: ds-harness-lan
+      name: 'ds-harness-lan'
       # dsh-TUI needs a scoped entry with explicit command/scene injects.
       # Keep this ordinary Desktop entry inactive when that front door exists.
       disabled: !!js >-
@@ -11,12 +11,14 @@
       config:
         enabled: true
         role: host
-        serverUrl: https://dsh.r2049.cn
+        lan:
+          enabled: false
+          port: 59090
         codex:
           enabled: true
           binary: codex
-    - id: ds-harness-remote-tui
-      name: 'ds-harness-remote'
+    - id: ds-harness-lan-tui
+      name: 'ds-harness-lan'
       disabled: !!js >-
         ![...ctx.loader.entries()].some(entry =>
           (entry.options.id === 'dsh-tui' || entry.options.name === '@deepseek-harness-tui/dsh-tui')
@@ -26,7 +28,9 @@
       config:
         enabled: true
         role: host
-        serverUrl: https://dsh.r2049.cn
+        lan:
+          enabled: false
+          port: 59090
         codex:
           enabled: true
           binary: codex

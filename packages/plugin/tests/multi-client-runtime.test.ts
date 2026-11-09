@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { createRpcRequest, type LoopbackRead, type LoopbackWsRead, type RemoteMessage, type RpcErrorPayload, type RpcResponsePayload } from '@dsh-remote/protocol'
 import { describe, expect, it, vi } from 'vitest'
 import { WebSocketServer } from 'ws'
-import type { ResolvedConfig } from '../src/config.js'
+import { resolveConfig, type ResolvedConfig } from '../src/config.js'
 import type { HostIdentity, IdentityStore } from '../src/identity-store.js'
 import type { SafeLogger } from '../src/logging.js'
 import { HostPluginRuntime } from '../src/service.js'
@@ -25,7 +25,7 @@ describe('HostPluginRuntime multi-Client routing', () => {
         try {
           await runtime.start()
           expect(start).toHaveBeenCalledTimes(enabled ? 1 : 0)
-          if (!enabled) expect(runtime.hostStatus()).toMatchObject({ online: false, authorized: false, accountRequired: false })
+          if (!enabled) expect(runtime.hostStatus()).toMatchObject({ online: false, authorized: true, accountRequired: false })
         } finally { await runtime.close() }
       } })))
     } finally { start.mockRestore() }
@@ -508,6 +508,7 @@ function fakeChannel(
 
 function config(): ResolvedConfig {
   return {
+    lan: resolveConfig({}, {}).lan,
     terminal: { enabled: false },
     loopback: { ports: [] },
     enabled: true,

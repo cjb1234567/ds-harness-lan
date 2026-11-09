@@ -1,7 +1,9 @@
-import { hostname } from 'node:os'
+import { hostname, networkInterfaces } from 'node:os'
+import { isIP } from 'node:net'
+import { randomBytes } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import type { ControlResult } from './control-result.js'
-import { resolveConfig, type Config, type ConfigInput, type ResolvedConfig } from './config.js'
+import { parseLanConfig, resolveConfig, type Config, type ConfigInput, type ResolvedConfig } from './config.js'
 import {
   ClientModeError,
   type ClientModeRuntime,
@@ -51,6 +53,9 @@ export interface PluginSettingsBinding {
 export class PluginControlRuntime {
   private logoutFlight?: Promise<PluginSettingsView>
   private serverSwitchFlight?: Promise<PluginSettingsView>
+  // A non-rejecting tail keeps a failed save from poisoning later retries.
+  private lanSettingsTail: Promise<void> = Promise.resolve()
+  private lanConfigError?: 'LAN_CONFIG_APPLY_FAILED' | 'LAN_CONFIG_ROLLBACK_FAILED'
 
   constructor(
     private config: ResolvedConfig,
@@ -62,7 +67,15 @@ export class PluginControlRuntime {
       client: ClientModeRuntime | undefined
       host: HostAuthorizationControl
     }>,
-  ) {}
+    private readonly onRemoteToolsChanged?: (enabled: boolean) => void | Promise<void>,
+  ) {
+    this.config = { ...config, serverUrl: undefined }
+  }
+
+  private currentConfig(): ResolvedConfig {
+    // Legacy account configuration and DSH_REMOTE_SERVER never enable a Server.
+    return { ...resolveConfig(this.settings?.get() ?? this.config), serverUrl: undefined }
+  }
 
   register(connection: HostConnectionHandle, webServer?: HostWebServerLike): () => Promise<void> {
     const statusStream = new ControlStatusStream(() => this.streamStatus())
@@ -87,8 +100,17 @@ export class PluginControlRuntime {
 
   private async handle(endpoint: string, payload: unknown, signal: AbortSignal): Promise<ControlResult<unknown>> {
     try {
-      // A request arriving during replacement must use the new Server runtime.
+      // Enqueue before awaiting anything: concurrent saves preserve arrival order.
+      if (endpoint === 'lan.settings.set') return ok(await this.setLanSettings(payload))
+      await this.lanSettingsTail
+      // A request arriving during replacement must not reference a closed runtime.
       if (endpoint !== 'settings.server.set') await this.serverSwitchFlight
+      if (endpoint === 'lan.settings.get') return ok(this.lanSettingsView())
+      if (endpoint === 'settings.configure' || endpoint === 'settings.server.set' || endpoint === 'settings.role.set'
+        || endpoint === 'settings.logout' || endpoint.startsWith('client.account.')
+        || endpoint.startsWith('host.account.') || endpoint.startsWith('host.registration-code.')) {
+        throw new ClientModeError('METHOD_NOT_ALLOWED', 'LAN connections use IP and port; account registration is unavailable.')
+      }
       if (endpoint === 'settings.development.set') return ok(await this.setDevelopment(payload))
       if (endpoint === 'settings.get') return ok(await this.settingsView())
       if (endpoint === 'settings.configure') return ok(await this.configure(payload))
@@ -105,7 +127,7 @@ export class PluginControlRuntime {
         if (typeof value.enabled !== 'boolean') throw new ClientModeError('INVALID_MESSAGE', 'Host authorization state is required.')
         const status = await this.client.setHostAuthorization(value.enabled)
         if (this.settings !== undefined) {
-          const current = resolveConfig(this.settings.get())
+          const current = this.currentConfig()
           await this.settings.replace(editableConfig({ ...current, hostControl: { enabled: value.enabled } }))
         }
         return ok(status)
@@ -142,6 +164,82 @@ export class PluginControlRuntime {
     }
   }
 
+  private lanSettingsView() {
+    const current = this.currentConfig()
+    return {
+      config: current.lan,
+      interfaces: Object.entries(networkInterfaces()).flatMap(([name, addresses]) =>
+        (addresses ?? []).filter(address => isIP(address.address) !== 0).map(address => ({
+          name, address: address.address, family: address.family, internal: address.internal,
+        }))),
+      writable: this.settings !== undefined && this.switchServer !== undefined,
+      ...(this.lanConfigError === undefined ? {} : { error: this.lanConfigError }),
+    }
+  }
+
+  private setLanSettings(payload: unknown): Promise<ReturnType<PluginControlRuntime['lanSettingsView']>> {
+    const task = this.lanSettingsTail.then(() => this.applyLanSettings(payload))
+    this.lanSettingsTail = task.then(() => undefined, () => undefined)
+    return task
+  }
+
+  private async applyLanSettings(payload: unknown): Promise<ReturnType<PluginControlRuntime['lanSettingsView']>> {
+    if (this.settings === undefined || this.switchServer === undefined) {
+      throw new ClientModeError('SETTINGS_UNAVAILABLE', 'LAN settings are unavailable in this profile.')
+    }
+    const current = this.currentConfig()
+    const values = record(payload)
+    if (typeof values.accessToken === 'string' && values.accessToken !== '' && values.accessToken.trim().length < 16) {
+      throw new ClientModeError('LAN_TOKEN_TOO_SHORT', 'Access token must contain at least 16 characters, excluding leading and trailing spaces.')
+    }
+    let lan
+    try {
+      const token = values.accessToken === '' || values.accessToken === undefined
+        ? current.lan.accessToken || randomBytes(32).toString('base64url')
+        : values.accessToken
+      lan = parseLanConfig({ ...current.lan, ...values, accessToken: token })
+    } catch {
+      // Schema diagnostics may include credentials: never return raw input/errors.
+      throw new ClientModeError('INVALID_MESSAGE', 'The LAN configuration is invalid.')
+    }
+    if (lan.accessToken === '') lan.accessToken = current.lan.accessToken || randomBytes(32).toString('base64url')
+    const next = { ...resolveConfig({ ...editableConfig(current), lan }), serverUrl: undefined }
+    let switchAttempted = false
+    try {
+      await this.settings.replace(editableConfig(next))
+      switchAttempted = true
+      const runtimes = await this.switchServer(next)
+      this.client = runtimes.client
+      this.host = runtimes.host
+      this.config = next
+      this.lanConfigError = undefined
+      return this.lanSettingsView()
+    } catch {
+      // Persistence may have partially committed even when replace rejects.
+      try {
+        await this.settings.replace(editableConfig(current))
+        if (switchAttempted) {
+          const restored = await this.switchServer(current)
+          this.client = restored.client
+          this.host = restored.host
+        }
+        this.config = current
+      } catch {
+        // Never dispatch through stale, possibly closed authorities. A later save
+        // still invokes switchServer, allowing recovery without profile edits.
+        const client = this.client
+        const host = this.host as (HostAuthorizationControl & { close?: () => Promise<void> }) | undefined
+        this.client = undefined
+        this.host = undefined
+        await Promise.allSettled([client?.close(), host?.close?.()])
+        this.lanConfigError = 'LAN_CONFIG_ROLLBACK_FAILED'
+        throw new ClientModeError('LAN_CONFIG_ROLLBACK_FAILED', 'LAN configuration failed and recovery failed. Dependent control runtimes are stopped; save LAN settings again to retry.')
+      }
+      this.lanConfigError = 'LAN_CONFIG_APPLY_FAILED'
+      throw new ClientModeError('LAN_CONFIG_APPLY_FAILED', 'LAN configuration was not applied. The previous configuration was restored; save LAN settings again to retry.')
+    }
+  }
+
   private async configure(payload: unknown): Promise<Record<string, unknown>> {
     if (this.settings === undefined) {
       throw new ClientModeError('SETTINGS_UNAVAILABLE', 'DSH user settings are unavailable in this profile.')
@@ -153,7 +251,7 @@ export class PluginControlRuntime {
     if (typeof value.serverUrl !== 'string') {
       throw new ClientModeError('INVALID_MESSAGE', 'Server URL is required.')
     }
-    const current = editableConfig(resolveConfig(this.settings.get()))
+    const current = editableConfig(this.currentConfig())
     const next = resolveConfig({ ...current, role: value.role, serverUrl: value.serverUrl })
 
     const identities = new IdentityStore({
@@ -175,7 +273,7 @@ export class PluginControlRuntime {
         return identity
       })
     }
-    if (value.role === 'client' && resolveConfig(this.settings.get()).hostControl?.enabled !== false) {
+    if (value.role === 'client' && this.currentConfig().hostControl?.enabled !== false) {
       await this.client?.authorizeHostByDefault()
     }
     await this.settings.replace(editableConfig(next))
@@ -209,7 +307,7 @@ export class PluginControlRuntime {
     if (typeof value.serverUrl !== 'string') {
       throw new ClientModeError('INVALID_MESSAGE', 'Server URL is required.')
     }
-    const current = editableConfig(resolveConfig(this.settings.get()))
+    const current = editableConfig(this.currentConfig())
     const next = resolveConfig({ ...current, serverUrl: value.serverUrl })
     await this.settings.replace(editableConfig(next))
     if (this.switchServer !== undefined) {
@@ -232,7 +330,7 @@ export class PluginControlRuntime {
     if (role !== 'host' && role !== 'client') {
       throw new ClientModeError('INVALID_MESSAGE', 'Role must be Host or Client.')
     }
-    const current = editableConfig(resolveConfig(this.settings.get()))
+    const current = editableConfig(this.currentConfig())
     const currentRole = current.role === 'client' ? 'client' : 'host'
     if (role !== currentRole && current.serverUrl !== undefined
       && await this.association(current.serverUrl, role) === undefined) {
@@ -249,13 +347,14 @@ export class PluginControlRuntime {
     if (value.terminalEnabled !== undefined && typeof value.terminalEnabled !== 'boolean') throw new ClientModeError('INVALID_MESSAGE', 'The terminal switch must be a boolean.')
     if (value.ports !== undefined && (!Array.isArray(value.ports) || value.ports.some((port) => !Number.isInteger(port)))) throw new ClientModeError('INVALID_MESSAGE', 'Loopback ports must be integers.')
     if (value.terminalEnabled === undefined && value.remoteToolsEnabled === undefined && value.ports === undefined) throw new ClientModeError('INVALID_MESSAGE', 'A development setting is required.')
-    const current = editableConfig(resolveConfig(this.settings.get()))
+    const current = editableConfig(this.currentConfig())
     const next = resolveConfig({ ...current,
       terminal: { enabled: value.terminalEnabled === undefined ? (current.terminal?.enabled ?? true) : value.terminalEnabled },
       remoteTools: { enabled: value.remoteToolsEnabled === undefined ? (current.remoteTools?.enabled ?? true) : value.remoteToolsEnabled },
       loopback: { ports: value.ports === undefined ? (current.loopback?.ports ?? []) : value.ports },
     })
     await this.settings.replace(editableConfig(next))
+    if (value.remoteToolsEnabled !== undefined) await this.onRemoteToolsChanged?.(value.remoteToolsEnabled)
     if (value.terminalEnabled !== undefined) this.host?.setTerminalEnabled?.(value.terminalEnabled)
     if (value.ports !== undefined) this.host?.setLoopbackPorts?.(value.ports)
     return this.settingsView()
@@ -280,7 +379,7 @@ export class PluginControlRuntime {
     if (typeof enabled !== 'boolean') {
       throw new ClientModeError('INVALID_MESSAGE', 'Cursor Remote enabled must be a boolean.')
     }
-    const current = editableConfig(resolveConfig(this.settings.get()))
+    const current = editableConfig(this.currentConfig())
     const next = resolveConfig({
       ...current,
       cursor: { ...current.cursor, enabled },
@@ -290,7 +389,7 @@ export class PluginControlRuntime {
       },
     })
     await this.settings.replace(editableConfig(next))
-    await this.host?.setAgentBackends?.(resolveConfig(this.settings.get()))
+    await this.host?.setAgentBackends?.(this.currentConfig())
     return { ...await this.settingsView(), applies: 'live' }
   }
 
@@ -300,7 +399,7 @@ export class PluginControlRuntime {
     const backend = value.backend
     const enabled = value.enabled
     if (typeof backend !== 'string' || typeof enabled !== 'boolean') throw new ClientModeError('INVALID_MESSAGE', 'ACP backend and enabled are required.')
-    const current = resolveConfig(this.settings.get())
+    const current = this.currentConfig()
     if (!current.acp?.backends.some(item => item.id === backend)) throw new ClientModeError('INVALID_MESSAGE', 'Unknown ACP backend.')
     const backends = current.acp.backends.map(item => item.id === backend ? { ...item, enabled } : item)
     await this.settings.replace({
@@ -309,7 +408,7 @@ export class PluginControlRuntime {
       ...(backend === 'codex' ? { codex: { ...current.codex, enabled } } : {}),
       acp: { enabled: enabled || current.acp.enabled, backends },
     })
-    await this.host?.setAgentBackends?.(resolveConfig(this.settings.get()))
+    await this.host?.setAgentBackends?.(this.currentConfig())
     return { ...await this.settingsView(), applies: 'live' }
   }
 
@@ -319,13 +418,13 @@ export class PluginControlRuntime {
     if (typeof value.id !== 'string' || typeof value.command !== 'string' || !Array.isArray(value.args) || !value.args.every(item => typeof item === 'string')) {
       throw new ClientModeError('INVALID_MESSAGE', 'ACP name, command, and arguments are required.')
     }
-    const current = resolveConfig(this.settings.get())
+    const current = this.currentConfig()
     if (value.id === 'kimi') throw new ClientModeError('INVALID_MESSAGE', 'Kimi is not implemented.')
     if (current.acp?.backends.some(item => item.id === value.id)) throw new ClientModeError('INVALID_MESSAGE', 'ACP backend already exists.')
     const backends = [...(current.acp?.backends ?? []), { id: value.id, command: value.command, args: value.args, enabled: false }]
     const next = resolveConfig({ ...editableConfig(current), acp: { enabled: current.acp?.enabled ?? true, backends } })
     await this.settings.replace(editableConfig(next))
-    await this.host?.setAgentBackends?.(resolveConfig(this.settings.get()))
+    await this.host?.setAgentBackends?.(this.currentConfig())
     return { ...await this.settingsView(), applies: 'live' }
   }
 
@@ -333,10 +432,10 @@ export class PluginControlRuntime {
     if (this.settings === undefined) throw new ClientModeError('SETTINGS_UNAVAILABLE', 'DSH user settings are unavailable in this profile.')
     const id = record(payload).id
     if (typeof id !== 'string' || ['codex', 'cursor', 'antigravity', 'pi', 'claude', 'opencode'].includes(id)) throw new ClientModeError('INVALID_MESSAGE', 'Only custom ACP backends can be removed.')
-    const current = resolveConfig(this.settings.get())
+    const current = this.currentConfig()
     const backends = (current.acp?.backends ?? []).filter(item => item.id !== id)
     await this.settings.replace(editableConfig({ ...current, acp: { enabled: current.acp?.enabled ?? true, backends } }))
-    await this.host?.setAgentBackends?.(resolveConfig(this.settings.get()))
+    await this.host?.setAgentBackends?.(this.currentConfig())
     return { ...await this.settingsView(), applies: 'live' }
   }
   private async authorizeOwnedRole(
@@ -372,7 +471,7 @@ export class PluginControlRuntime {
   }
 
   private async clearAuthorization(): Promise<PluginSettingsView> {
-    const config = this.settings === undefined ? this.config : resolveConfig(this.settings.get())
+    const config = this.settings === undefined ? this.config : this.currentConfig()
     if (config.serverUrl !== undefined) {
       const runtimes = await Promise.allSettled([
         this.client?.clearClientAuthorization(),
@@ -391,7 +490,7 @@ export class PluginControlRuntime {
   }
 
   private async settingsView(): Promise<PluginSettingsView> {
-    const config = this.settings === undefined ? editableConfig(this.config) : editableConfig(resolveConfig(this.settings.get()))
+    const config = this.settings === undefined ? editableConfig(this.config) : editableConfig(this.currentConfig())
     const associations = await this.associations(config)
     const role = config.role === 'client' ? 'client' : 'host'
     const association = associations[role]
@@ -437,6 +536,7 @@ export class PluginControlRuntime {
       available: false,
       deviceName: hostname(),
       hostAuthorizationAvailable: this.host !== undefined,
+      ...(this.lanConfigError === undefined ? {} : { error: this.lanConfigError }),
       ...(this.host === undefined ? {} : { host: this.host.hostStatus() }),
     }
   }
@@ -455,8 +555,9 @@ function commandAvailable(command: string): boolean {
 function editableConfig(config: ResolvedConfig): Config {
   return {
     enabled: config.enabled,
+    lan: config.lan,
+    deviceName: config.deviceName,
     role: config.role,
-    ...(config.serverUrl === undefined ? {} : { serverUrl: config.serverUrl }),
     terminal: config.terminal,
     remoteTools: config.remoteTools,
     hostControl: config.hostControl ?? { enabled: true },

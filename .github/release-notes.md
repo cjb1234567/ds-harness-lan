@@ -1,35 +1,21 @@
 ## 中文
 
-**v0.5.23 · Android build 68**
+**DSH LAN v0.5.23-lan.1 — 社区测试预发布**
 
-### 更新
+- 基于 [liguobao/ds-harness-remote](https://github.com/liguobao/ds-harness-remote) 的社区分支，保留上游作者署名及 MIT 许可，非 DeepSeek 官方产品。
+- 在两台已有 Harness 的电脑之间，使用 Host 局域网 IP、端口及共享 token 直连；保留可用后端的 Harness、CodeX 与 ACP 工作区访问。
+- 在插件管理中从 GitHub 仓库 `cjb1234567/ds-harness-lan` 安装，选择 tag `v0.5.23-lan.1`，两端安装相同版本并重启 Harness；不通过 npm 发布，也不提供 Android LAN 客户端。
+- LAN 监听默认关闭。仅在可信局域网显式开启并设置强 token，禁止公网端口转发。首次 descriptor/token 交换使用明文 HTTP，后续业务流量使用 Noise IK 加密；终端以 Host 系统用户权限执行。
 
-- 更新多语言 Remote 设置说明，明确支持通过端到端加密 P2P 网络访问 DeepSeek Harness、CodeX、Claude Code 和 Pi 工作区，覆盖桌面、网页、iOS 与 Android 客户端。
-- 简化设置布局：移除 Server 地址，将账号授权说明与账号值放在同一行；保留 ACP 设置并移除无用的新增工作区入口。
-
-### 修复
-
-- 修复 Remote 面板打开后刷新和关闭按钮有时无法点击的问题。
-- 默认开启 Remote Tools，并修复设置不可用时的 Host 发现。
-- 加固大响应传输、搜索投影和连接生命周期的超时与大小边界。
-- 修复 CodeX 会话模型元数据恢复，并稳定 HMR 重载期间的设置写入。
-
-感谢择梦舟（@dreamfarer-space）的贡献。
+完整安装和安全说明见仓库 README 与 `packages/plugin/README.md`。
 
 ## English
 
-**v0.5.23 · Android build 68**
+**DSH LAN v0.5.23-lan.1 — community testing prerelease**
 
-### Updates
+- Community fork of [liguobao/ds-harness-remote](https://github.com/liguobao/ds-harness-remote), retaining upstream author attribution and the MIT license; not an official DeepSeek product.
+- Connect two computers running Harness through the Host's LAN IP, port and shared token, retaining Harness, CodeX and ACP workspace access where the backends are available.
+- In Plugin management, install from GitHub repository `cjb1234567/ds-harness-lan`, select tag `v0.5.23-lan.1`, and restart Harness after installing the same version on both computers. This release does not publish to npm or provide an Android LAN client.
+- LAN listening is disabled by default. Enable it only on a trusted LAN with a strong token; do not forward the port publicly. Initial descriptor/token exchange uses plain HTTP; subsequent business traffic uses Noise IK encryption. Terminals execute with the Host OS user's privileges.
 
-- Refresh the multilingual Remote settings copy to describe end-to-end encrypted P2P access to DeepSeek Harness, Codex, Claude Code, and Pi workspaces across desktop, web, iOS, and Android.
-- Simplify the settings layout by removing the Server address, keeping account authorization details together, retaining ACP settings, and removing the unused add-workspace entry.
-
-### Fixes
-
-- Fix Remote panel refresh and close actions being blocked after the panel opens.
-- Enable Remote Tools by default, while preserving the setting to disable them and Host discovery when settings are unavailable.
-- Harden deadlines and size limits for large responses, search projections, and connection lifecycle cleanup.
-- Preserve CodeX session model metadata and stabilize settings writes during HMR reloads.
-
-Thanks to 择梦舟 (@dreamfarer-space) for the contribution.
+See the repository README and `packages/plugin/README.md` for installation and security details.

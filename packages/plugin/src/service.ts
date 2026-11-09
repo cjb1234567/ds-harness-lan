@@ -1,3 +1,4 @@
+import { LanHostListener } from './lan-host.js'
 import { WorkspaceUploadHost } from './workspace-upload.js'
 import { workspaceUploadRootResolver } from './workspace-upload-authority.js'
 import { LoopbackHost } from './loopback-host.js'
@@ -69,6 +70,7 @@ export class HostPluginRuntime {
   private identity?: HostIdentity
   private readonly serverApi?: HostServerApi
   private serverConnection?: HostServerConnection
+  private lanListener?: LanHostListener
   private harnessVersion?: string
   private closed = false
   private readonly codex: CodexRemoteDomain
@@ -194,8 +196,13 @@ export class HostPluginRuntime {
     void this.acp.start().catch(() => {
       this.logger.warn('ACP background initialization failed', { code: 'ACP_START_FAILED' })
     })
+    this.harnessVersion = await this.readHarnessVersion()
+    this.lanListener = new LanHostListener(this.config.lan, this.identities, this.connections, this.logger, {
+      harnessVersion: this.harnessVersion,
+      clientVersion: '0.5.23-lan.1',
+    })
+    await this.lanListener.start()
     if (this.serverApi !== undefined) {
-      this.harnessVersion = await this.readHarnessVersion()
       this.serverApi.setHarnessVersion(this.harnessVersion)
       this.serverApi.bindIdentity(this.identity)
       this.serverConnection = this.createServerConnection(this.identity)
@@ -218,16 +225,16 @@ export class HostPluginRuntime {
     const authorization = this.serverApi?.currentAuthorization()
     return {
       ...(this.identity === undefined ? {} : { deviceId: this.identity.deviceId }),
-      configured: this.serverApi !== undefined,
-      online: this.serverConnection?.isOnline() ?? false,
-      reconnecting: this.serverConnection?.isReconnecting() ?? false,
+      configured: this.config.lan.enabled,
+      online: this.lanListener?.status().listening ?? false,
+      reconnecting: false,
       ...(this.serverConnection?.lastActivity() === undefined
         ? {}
         : { lastActiveAt: this.serverConnection.lastActivity() }),
       ...(error === undefined ? {} : { error }),
       ...(authorization?.account === undefined ? {} : { account: authorization.account }),
-      authorized: authorization !== undefined,
-      accountRequired: error === 'ACCOUNT_AUTH_REQUIRED' || error === 'AUTH_REQUIRED' || error === 'AUTH_INVALID' || error === 'TOKEN_EXPIRED' || error === 'DEVICE_REVOKED' || error === 'DEVICE_OWNERSHIP_REQUIRED',
+      authorized: true,
+      accountRequired: false,
       connectedClients: this.listConnectedClients(),
     }
   }
@@ -415,6 +422,7 @@ export class HostPluginRuntime {
     if (this.closed) return
     this.closed = true
     this.serverApi?.close()
+    await this.lanListener?.close()
     await this.serverConnection?.stop()
     await this.connections.close()
     await this.localCodexPeer?.closeAll()

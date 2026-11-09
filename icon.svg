@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">DSH LAN</title>
+  <desc id="desc">Three connected network nodes, original community LAN fork artwork</desc>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#123047"/>
+  <path d="M64 46v20M30 84V66h68v18" fill="none" stroke="#71ead1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="46" y="20" width="36" height="28" rx="7" fill="#e6faff"/>
+  <rect x="14" y="82" width="32" height="26" rx="7" fill="#71ead1"/>
+  <rect x="82" y="82" width="32" height="26" rx="7" fill="#71ead1"/>
+  <path d="M56 34h16M24 95h12M92 95h12" stroke="#123047" stroke-width="4" stroke-linecap="round"/>
+</svg>

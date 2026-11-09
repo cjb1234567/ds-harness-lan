@@ -92,7 +92,7 @@ export function createRemoteSessionHeaderAction(React: ClientReact) {
         setBusy(false)
       }
     }
-    const transport = status.network?.webRtc?.mode ?? status.transport ?? 'Disconnected'
+    const transport = status.transport ?? 'Disconnected'
     const networkLabel = transport === 'P2P'
       ? t('remoteNetworkP2p')
       : transport === 'TURN'
@@ -118,7 +118,7 @@ export function createRemoteSessionHeaderAction(React: ClientReact) {
           ? t('connectionRouteRelayDetail')
           : t('connectionRouteLanDetail')
     const network = status.network
-    const webRtc = network?.webRtc
+    const webRtc = status.lan === undefined ? network?.webRtc : undefined
     const controlStateLabel = network?.controlChannelState === 'connecting'
       ? t('controlStateConnecting')
       : network?.controlChannelState === 'open'
@@ -212,7 +212,7 @@ export function createRemoteSessionHeaderAction(React: ClientReact) {
               : formatBitrate(webRtc.availableOutgoingBitrate)),
             fact(t('bytesSent'), webRtc.bytesSent === undefined ? t('notProvided') : formatByteSize(webRtc.bytesSent)),
             fact(t('bytesReceived'), webRtc.bytesReceived === undefined ? t('notProvided') : formatByteSize(webRtc.bytesReceived)))),
-        React.createElement('p', null, t('connectionRouteEncrypted')))))
+        React.createElement('p', null, t(status.lan === undefined ? 'connectionRouteEncrypted' : 'lanEncrypted')))))
   }
 
   return RemoteSessionHeaderAction

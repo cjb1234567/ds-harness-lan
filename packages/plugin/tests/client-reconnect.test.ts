@@ -52,7 +52,10 @@ async function fixture(enabled = true) {
     wireStream: { open: async () => (async function* () {})(), failure: () => ({ code: 'internal', message: '', details: {} }) },
   }
   runtime = new ClientModeRuntime(
-    resolveConfig({ reconnect: enabled ? { initialDelayMs: 100, maxDelayMs: 1000, jitter: 0 } : false }),
+    resolveConfig({ lan: { enabled: true, accessToken: 'local-reconnect-token-123456', hosts: [
+      { id: 'host-1', name: 'Host 1', host: '127.0.0.1', port: 59090 },
+      { id: 'host-2', name: 'Host 2', host: '127.0.0.1', port: 59091 },
+    ] }, reconnect: enabled ? { initialDelayMs: 100, maxDelayMs: 1000, jitter: 0 } : false }),
     new IdentityStore({ directory }),
     { bindIdentity: vi.fn(), revokeCurrentDevice: vi.fn(async () => undefined) } as unknown as ClientServerApi,
     gateway, { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() } as unknown as SafeLogger,
@@ -115,8 +118,8 @@ it('recovers the selected Host with bounded backoff and fresh reads without repl
   expect(f.runtime.status()).toMatchObject({ connected: true, recoveryGeneration: 2 })
 })
 
-it('stops timers and retires late candidates on exit, sign-out, shutdown and Host replacement', async () => {
-  await runScenarios((['exit', 'sign-out', 'shutdown', 'switch'] as const).flatMap(action =>
+it('stops timers and retires late candidates on exit, shutdown and Host replacement', async () => {
+  await runScenarios((['exit', 'shutdown', 'switch'] as const).flatMap(action =>
     (['waiting', 'connecting'] as const).map(phase => ({ name: `${action}: ${phase}`, run: async () => {
       const f = await fixture()
       let resolve: ((remote: ConnectedRemote) => void) | undefined
@@ -129,7 +132,6 @@ it('stops timers and retires late candidates on exit, sign-out, shutdown and Hos
       if (phase === 'connecting') await vi.advanceTimersByTimeAsync(100)
       else f.connect.mockReset().mockImplementation(f.makeRemote)
       if (action === 'exit') await f.runtime.setMode('local')
-      else if (action === 'sign-out') await f.runtime.clearClientAuthorization()
       else if (action === 'shutdown') await f.runtime.close()
       else await f.runtime.setMode('remote', 'host-2')
       if (resolve !== undefined) {
